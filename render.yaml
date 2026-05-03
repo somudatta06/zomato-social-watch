@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: zomato-social-watch
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /
+    envVars:
+      - key: DB_PATH
+        value: /tmp/social_watch.db
+      - key: REFRESH_INTERVAL
+        value: "300"
+      - key: REDDIT_USER_AGENT
+        value: "zomato-social-watch:0.1 (by /u/somudatta06)"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TWITTER_COOKIE_USERNAME
+        sync: false
+      - key: TWITTER_COOKIE_AUTH_TOKEN
+        sync: false
+      - key: TWITTER_COOKIE_CT0
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DASHBOARD_BASE_URL
+        sync: false
