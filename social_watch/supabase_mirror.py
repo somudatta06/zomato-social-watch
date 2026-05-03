@@ -7,10 +7,15 @@ ephemeral container restarts (e.g. Render free tier wipes /tmp).
 Graceful degradation: if SUPABASE_URL or SUPABASE_SERVICE_KEY is
 unset, mirror_posts() is a no-op. Network errors are logged but
 never raised — the primary SQLite path is never blocked.
+
+restore_to_sqlite() is the inverse: on a cold container boot with
+an empty local DB, pull every post back from Supabase so the
+dashboard isn't blank for the first 5 minutes.
 """
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Iterable
 
 import httpx
@@ -54,3 +59,70 @@ async def mirror_posts(rows: Iterable[dict[str, Any]]) -> None:
             logger.debug(f"[supabase] mirrored {len(rows)} posts")
     except Exception as e:
         logger.warning(f"[supabase] mirror failed: {type(e).__name__}: {e}")
+
+
+async def restore_to_sqlite(db_path: str | Path) -> int:
+    """Pull every row from Supabase posts → INSERT OR IGNORE into local SQLite.
+
+    Skips if the local table already has rows (don't clobber a warm DB).
+    Returns the number of posts restored. Logs and returns 0 on any error.
+    """
+    if not _is_configured():
+        return 0
+    import aiosqlite
+
+    async with aiosqlite.connect(str(db_path)) as db:
+        cur = await db.execute("SELECT COUNT(*) FROM posts")
+        row = await cur.fetchone()
+        existing = row[0] if row else 0
+    if existing > 0:
+        logger.info(f"[supabase] restore skipped — local DB already has {existing} posts")
+        return 0
+
+    base_url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/posts"
+    key = os.environ["SUPABASE_SERVICE_KEY"]
+    headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+    cols = "id,source,native_id,author,content,url,created_at,fetched_at,metadata"
+    PAGE = 1000
+    offset = 0
+    rows: list[dict[str, Any]] = []
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            while True:
+                r = await client.get(
+                    base_url,
+                    params={"select": cols, "order": "created_at.asc",
+                            "limit": PAGE, "offset": offset},
+                    headers=headers,
+                )
+                if r.status_code != 200:
+                    logger.warning(f"[supabase] restore: HTTP {r.status_code}: {r.text[:200]}")
+                    return 0
+                batch = r.json()
+                if not batch:
+                    break
+                rows.extend(batch)
+                if len(batch) < PAGE:
+                    break
+                offset += PAGE
+    except Exception as e:
+        logger.warning(f"[supabase] restore failed: {type(e).__name__}: {e}")
+        return 0
+
+    if not rows:
+        logger.info("[supabase] restore: no rows in remote table")
+        return 0
+
+    async with aiosqlite.connect(str(db_path)) as db:
+        await db.executemany(
+            """
+            INSERT OR IGNORE INTO posts
+              (id, source, native_id, author, content, url, created_at, fetched_at, metadata)
+            VALUES
+              (:id, :source, :native_id, :author, :content, :url, :created_at, :fetched_at, :metadata)
+            """,
+            rows,
+        )
+        await db.commit()
+    logger.info(f"[supabase] restored {len(rows)} posts from Supabase to local SQLite")
+    return len(rows)

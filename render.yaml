@@ -12,6 +12,8 @@ services:
         value: "300"
       - key: REDDIT_USER_AGENT
         value: "zomato-social-watch:0.1 (by /u/somudatta06)"
+      - key: SUPABASE_RESTORE_ON_BOOT
+        value: "1"
       - key: GEMINI_API_KEY
         sync: false
       - key: TWITTER_COOKIE_USERNAME

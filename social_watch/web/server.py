@@ -232,6 +232,13 @@ def _pagination_pages(current: int, total: int, max_visible: int = 7) -> list[in
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if os.environ.get("SUPABASE_RESTORE_ON_BOOT") == "1":
+        from ..storage import Storage
+        from ..supabase_mirror import restore_to_sqlite
+        storage = Storage(config.DB_PATH)
+        await storage.init()
+        await restore_to_sqlite(config.DB_PATH)
+
     sync_task: asyncio.Task | None = None
     if _AUTO_SYNC:
         logger.info(
