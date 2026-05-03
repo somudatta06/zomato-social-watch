@@ -234,6 +234,8 @@ class Storage:
             )
             await db.commit()
             new = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+        from .supabase_mirror import mirror_posts
+        await mirror_posts(rows)
         return len(rows), new
 
     async def get_watermark(self, source_query: str) -> dict[str, Any] | None:
