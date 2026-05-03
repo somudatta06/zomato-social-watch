@@ -1,0 +1,486 @@
+# Zomato Merchant App — topic taxonomy
+#
+# Same schema as consumer.yaml. Restaurant owner / operator side.
+# Edits take effect on next classifier run.
+
+side: merchant
+
+categories:
+
+  # ============================================================
+  - id: onboarding_verification
+    name: "M1 Onboarding & Verification"
+    default_audience: [merchant-onboarding]
+    default_urgency: medium
+    children:
+      - id: signup_blocker
+        name: "M1.1 Sign-up / registration blocker"
+        examples:
+          - "Can't complete restaurant signup, form keeps erroring"
+          - "Stuck at OTP step for 3 days"
+        default_audience: [merchant-onboarding, eng]
+
+      - id: kyc_verification
+        name: "M1.2 KYC / FSSAI / GST verification stuck"
+        examples:
+          - "FSSAI document uploaded, still pending verification 2 weeks"
+          - "GST verification rejected, no reason given"
+        urgency_modifier: 0.10
+        default_audience: [merchant-onboarding, compliance]
+
+      - id: docs_rejected
+        name: "M1.3 Documentation rejected without reason"
+        examples:
+          - "Documents rejected 3 times, no specific reason cited"
+          - "Why was my menu PDF rejected?"
+        urgency_modifier: 0.10
+        action_hint: "DM for restaurant ID, full review of rejection notes"
+
+      - id: listing_not_live
+        name: "M1.4 Account approved but listing not live"
+        examples:
+          - "Onboarded a month ago, still not appearing on Zomato"
+          - "Approved but customers can't find me"
+        urgency_modifier: 0.20
+        default_audience: [merchant-onboarding, merchant-ops]
+
+      - id: timeline_complaint
+        name: "M1.5 Onboarding timeline complaint"
+        examples:
+          - "60 days to onboard, way too slow"
+          - "Swiggy onboarded me in a week, Zomato still not done"
+
+  # ============================================================
+  - id: listing_visibility
+    name: "M2 Listing & Visibility"
+    default_audience: [merchant-ops]
+    default_urgency: medium
+    children:
+      - id: not_in_search
+        name: "M2.1 Restaurant not in search / discovery"
+        examples:
+          - "My restaurant doesn't appear when customers search"
+          - "Listed but invisible — orders dropped to zero"
+        urgency_modifier: 0.20
+        default_audience: [merchant-ops, eng]
+
+      - id: wrong_tags
+        name: "M2.2 Wrong area / cuisine / tags"
+        examples:
+          - "Restaurant tagged in wrong cuisine, getting wrong customers"
+          - "Showing in wrong area on map"
+
+      - id: photos_menu
+        name: "M2.3 Photos / menu rejected or stuck"
+        examples:
+          - "Photos in review for 2 weeks"
+          - "Menu update rejected without explanation"
+
+      - id: delisted_suspended
+        name: "M2.4 Delisted / suspended without notice"
+        examples:
+          - "Restaurant suddenly delisted, no email, no warning"
+          - "Was live yesterday, gone today, no explanation"
+        default_urgency: critical
+        urgency_modifier: 0.30
+        default_audience: [merchant-ops, kam, legal]
+        sensitivity_flags: [relationship_risk]
+        action_hint: "Pull suspension reason, KAM contact, due-process review"
+
+      - id: hours_status_sync
+        name: "M2.5 Hours / operational status sync issue"
+        examples:
+          - "Marked closed even though I'm open"
+          - "Hours not syncing to customer app"
+
+  # ============================================================
+  - id: orders_operations
+    name: "M3 Orders & Operations"
+    default_audience: [merchant-ops]
+    default_urgency: medium
+    children:
+      - id: orders_dropped
+        name: "M3.1 Orders not coming through (volume drop)"
+        examples:
+          - "Orders dropped 80% this week, no platform reason"
+          - "Was getting 100 orders/day, now 20"
+        urgency_modifier: 0.20
+        default_audience: [merchant-ops, ranking-team]
+
+      - id: fake_prank_orders
+        name: "M3.2 Fake / prank orders"
+        examples:
+          - "Got 5 fake orders today, customer never picked up"
+          - "Prank orders increasing, costing me prep"
+        urgency_modifier: 0.15
+        default_audience: [merchant-ops, trust-safety]
+
+      - id: prep_time_penalty
+        name: "M3.3 Auto-cancellation / prep-time penalty"
+        examples:
+          - "Cancelled my order even though I confirmed it"
+          - "Penalty for delays beyond my control"
+        default_audience: [merchant-ops]
+
+      - id: customer_fraud_claim
+        name: "M3.4 Customer fraud claim (false non-delivery)"
+        examples:
+          - "Customer claimed non-delivery to get refund, agent confirmed delivered"
+          - "Repeat customer doing fake refund claims, costing me"
+        urgency_modifier: 0.20
+        default_audience: [merchant-ops, trust-safety, finance]
+        sensitivity_flags: [fraud_potential]
+
+      - id: agent_no_show
+        name: "M3.5 Delivery agent didn't show up / sabotage"
+        examples:
+          - "Agent never came, food got cold, lost the order"
+          - "Agent picked up and disappeared with food"
+        default_audience: [merchant-ops, delivery-ops]
+
+      - id: marked_closed
+        name: "M3.6 Marked closed by mistake"
+        examples:
+          - "Restaurant showing closed even though we're open"
+          - "Lost a peak hour because Zomato marked us closed"
+        urgency_modifier: 0.20
+
+  # ============================================================
+  - id: payment_settlement
+    name: "M4 Payment & Settlement"
+    default_audience: [finance, merchant-ops]
+    default_urgency: high
+    children:
+      - id: payout_delayed
+        name: "M4.1 Weekly payout delayed"
+        examples:
+          - "Payout delayed by 5 days, no communication"
+          - "Cash flow hit because Zomato didn't pay on time"
+        urgency_modifier: 0.20
+        action_hint: "DM for restaurant ID, finance audit, expedite if confirmed"
+
+      - id: settlement_mismatch
+        name: "M4.2 Settlement amount mismatch"
+        examples:
+          - "Settled ₹12000 but should be ₹15000"
+          - "Numbers don't match my own records"
+
+      - id: penalty_dispute
+        name: "M4.3 Penalty / deduction dispute"
+        examples:
+          - "₹500 deducted as penalty, no reason cited"
+          - "Multiple penalties, can't track why"
+
+      - id: tds_gst
+        name: "M4.4 TDS / GST issue"
+        examples:
+          - "TDS certificates not received"
+          - "GST mismatch with my filings"
+        default_audience: [finance, compliance, merchant-ops]
+
+      - id: chargeback_unfair
+        name: "M4.5 Refund chargeback unfair"
+        examples:
+          - "Customer claimed refund 2 weeks later, deducted from my account"
+          - "Chargeback for confirmed-delivery order"
+
+  # ============================================================
+  - id: commission_fees
+    name: "M5 Commission & Fees"
+    default_audience: [merchant-ops, finance, leadership]
+    default_urgency: medium
+    children:
+      - id: commission_dispute
+        name: "M5.1 Commission rate too high / unfair [⚠ collective-risk]"
+        examples:
+          - "30% commission is killing small restaurants"
+          - "Zomato commission unsustainable, may have to leave"
+        urgency_modifier: 0.20
+        default_audience: [merchant-ops, leadership, pr]
+        sensitivity_flags: [collective_action_risk]
+
+      - id: hidden_charges
+        name: "M5.2 Hidden charges allegation"
+        examples:
+          - "Charges I didn't agree to, reading the fine print now"
+          - "Surprise fees not in original contract"
+        urgency_modifier: 0.20
+        default_audience: [merchant-ops, finance, legal]
+
+      - id: subscription_value
+        name: "M5.3 Pro subscription value dispute"
+        examples:
+          - "Pro subscription not delivering ROI"
+          - "Paying for Pro, no visibility difference"
+
+      - id: fee_change_grievance
+        name: "M5.4 Fee-change communication grievance"
+        examples:
+          - "Changed commission without notice"
+          - "Increased fee, learned only when I got my settlement"
+
+  # ============================================================
+  - id: reviews_rating
+    name: "M6 Reviews & Rating"
+    default_audience: [trust-safety, merchant-ops]
+    default_urgency: medium
+    children:
+      - id: false_review
+        name: "M6.1 Cannot remove false review [⚠ trust-violation]"
+        examples:
+          - "Customer who never ordered left a 1-star review"
+          - "Defamatory review, can't get it removed"
+        urgency_modifier: 0.20
+        sensitivity_flags: [trust_violation]
+        default_audience: [trust-safety, merchant-ops, legal]
+
+      - id: extortion_threat
+        name: "M6.2 Customer review threats / extortion"
+        examples:
+          - "Customer threatening 1-star unless I refund full"
+          - "Got blackmailed for free meal, threatened bad review"
+        urgency_modifier: 0.30
+        default_audience: [trust-safety, legal]
+        sensitivity_flags: [legal_risk]
+
+      - id: rating_drop_platform
+        name: "M6.3 Rating dropped due to platform-side issue"
+        examples:
+          - "Rating dropped because Zomato delivery was late, not my food"
+          - "Bad rating because of agent, not me"
+
+      - id: review_bomb
+        name: "M6.4 Competitor review-bombing / coordinated attack"
+        examples:
+          - "20 fake 1-star reviews in one night"
+          - "Coordinated review-bombing — all from new accounts"
+        urgency_modifier: 0.30
+        default_audience: [trust-safety, merchant-ops]
+        sensitivity_flags: [coordinated_attack]
+
+      - id: review_reply_broken
+        name: "M6.5 Review-reply feature broken"
+        examples:
+          - "Can't reply to customer reviews from dashboard"
+          - "Review reply submits but doesn't show"
+        default_audience: [merchant-eng]
+
+  # ============================================================
+  - id: analytics_dashboard
+    name: "M7 Analytics & Dashboard"
+    default_audience: [merchant-product]
+    default_urgency: low
+    children:
+      - id: data_wrong
+        name: "M7.1 Sales / data wrong"
+        examples:
+          - "Dashboard shows 30 orders but I had 45"
+          - "Revenue numbers don't match"
+
+      - id: insights_missing
+        name: "M7.2 Customer insights missing"
+        examples:
+          - "Where's the demographic data they promised?"
+          - "Insights tab is empty"
+
+      - id: reporting_bugs
+        name: "M7.3 Reporting / export bugs"
+        examples:
+          - "CSV export gives empty file"
+          - "Date filter not working"
+
+  # ============================================================
+  - id: ads_growth
+    name: "M8 Ads & Growth"
+    default_audience: [ads-team, merchant-ops]
+    default_urgency: medium
+    children:
+      - id: ads_roi
+        name: "M8.1 Ads ROI / charged-but-not-delivered"
+        examples:
+          - "Spent ₹5000 on ads, no orders attributable"
+          - "Charged for impressions that don't seem real"
+        urgency_modifier: 0.15
+        default_audience: [ads-team, finance]
+
+      - id: campaign_delivery
+        name: "M8.2 Promo / campaign delivery issue"
+        examples:
+          - "Set up campaign but ads aren't running"
+          - "Campaign budget exhausted but no clicks"
+
+      - id: visibility_boost
+        name: "M8.3 Visibility-boost dispute"
+        examples:
+          - "Paid for boost, ranking unchanged"
+          - "Promised top-of-search, not happening"
+
+  # ============================================================
+  - id: policy_trust
+    name: "M9 Policy & Trust"
+    default_audience: [legal, merchant-leadership]
+    default_urgency: high
+    children:
+      - id: suspended_no_notice
+        name: "M9.1 Suspended without notice / appeal rejected"
+        examples:
+          - "Suspended without warning, lost a week of revenue"
+          - "Appeal denied with no explanation"
+        urgency_modifier: 0.30
+        default_audience: [merchant-ops, legal, kam]
+        sensitivity_flags: [relationship_risk, due_process]
+
+      - id: bias_allegation
+        name: "M9.2 Manipulation / bias allegation [⚠ legal-risk]"
+        examples:
+          - "Zomato favours large chains over small restaurants"
+          - "Algorithm clearly biased against my type of cuisine"
+        urgency_modifier: 0.20
+        default_audience: [legal, leadership, pr]
+        sensitivity_flags: [legal_risk, narrative_risk]
+
+      - id: discrimination_chain_size
+        name: "M9.3 Discrimination (small vs chain restaurants)"
+        examples:
+          - "Small restaurants get worse rates, big chains favoured"
+          - "Treatment differs by chain size"
+        default_audience: [merchant-ops, legal, leadership]
+
+      - id: anti_competitive
+        name: "M9.4 Anti-competitive practice allegation [⚠ tripwire]"
+        examples:
+          - "Zomato forcing exclusivity, anti-competitive"
+          - "Reporting Zomato to CCI for predatory pricing"
+        default_urgency: critical
+        urgency_modifier: 0.40
+        default_audience: [legal, leadership, pr, regulatory]
+        sensitivity_flags: [regulatory, legal_risk, founder_attention]
+        requires_human_review: true
+
+  # ============================================================
+  - id: relationships_support
+    name: "M10 Relationships / Support"
+    default_audience: [merchant-success, kam]
+    default_urgency: medium
+    children:
+      - id: kam_unresponsive
+        name: "M10.1 Account manager unresponsive"
+        examples:
+          - "KAM hasn't replied in 2 weeks"
+          - "No support from my account manager"
+
+      - id: kam_changed
+        name: "M10.2 KAM changed without notice"
+        examples:
+          - "Got a new KAM without intro, lost relationship continuity"
+          - "Third KAM in 6 months"
+
+      - id: rep_promise_mismatch
+        name: "M10.3 Sales-rep promise vs delivered"
+        examples:
+          - "Rep promised X commission, charged Y"
+          - "Sales rep promised priority listing, didn't happen"
+        default_audience: [merchant-success, legal]
+
+  # ============================================================
+  - id: industry_collective
+    name: "M11 Industry / Collective [TRIPWIRE-CAPABLE]"
+    default_audience: [pr, legal, leadership]
+    default_urgency: critical
+    requires_human_review: true
+    description: "Industry-body, regulatory, or coordinated mass-action signals."
+    children:
+      - id: nrai_industry
+        name: "M11.1 NRAI / industry-body complaint or campaign"
+        examples:
+          - "NRAI letter to Zomato about commission"
+          - "Restaurant federation calling for changes"
+        sensitivity_flags: [collective_action_risk, narrative_risk]
+
+      - id: cci_regulatory
+        name: "M11.2 CCI / regulatory case mention"
+        examples:
+          - "CCI investigation into Zomato"
+          - "Court hearing on Zomato commission case"
+        sensitivity_flags: [regulatory, legal_risk, founder_attention]
+
+      - id: boycott_hashtag
+        name: "M11.3 Coordinated boycott / hashtag attack"
+        examples:
+          - "#LogoutZomato trending"
+          - "Mass campaign by restaurants to leave"
+        sensitivity_flags: [coordinated_attack, viral_risk]
+
+      - id: mass_strike
+        name: "M11.4 Mass restaurant action / strike"
+        examples:
+          - "Restaurants going off Zomato in protest"
+          - "Strike action announced for next week"
+        sensitivity_flags: [collective_action_risk]
+
+      - id: insider_leak
+        name: "M11.5 Insider leak / whistleblower [⚠ tripwire]"
+        examples:
+          - "Ex-Zomato employee revealing internal practices"
+          - "Leaked internal email about commission"
+        sensitivity_flags: [insider_leak, legal_risk, narrative_risk]
+        default_audience: [legal, hr, pr, founder-office]
+
+  # ============================================================
+  - id: app_technical_merchant
+    name: "M12 App / Technical (Merchant App)"
+    default_audience: [merchant-eng]
+    default_urgency: medium
+    children:
+      - id: crash_login_sync
+        name: "M12.1 Crash / login / sync"
+        examples:
+          - "Merchant app crashes when I log in"
+          - "Orders not syncing to my dashboard"
+
+      - id: order_acceptance
+        name: "M12.2 Order acceptance flow broken"
+        examples:
+          - "Can't accept orders, stuck at confirmation"
+          - "Accept button does nothing"
+        urgency_modifier: 0.20
+
+      - id: menu_management
+        name: "M12.3 Menu management bugs"
+        examples:
+          - "Can't update prices in bulk"
+          - "Menu changes not propagating to customer app"
+
+      - id: performance
+        name: "M12.4 Performance / responsiveness"
+        examples:
+          - "Merchant app extremely slow during peak hours"
+
+  # ============================================================
+  - id: safety_merchant
+    name: "M13 Safety (Merchant-side) [TRIPWIRE-CAPABLE]"
+    default_audience: [trust-safety, legal, pr]
+    default_urgency: critical
+    requires_human_review: true
+    children:
+      - id: customer_threats
+        name: "M13.1 Threats from customers"
+        examples:
+          - "Customer threatened me physically when I refused refund"
+          - "Got threatening messages from customer"
+        sensitivity_flags: [threat, evidence_preservation]
+
+      - id: agent_threats
+        name: "M13.2 Threats from delivery agents"
+        examples:
+          - "Delivery agent threatened my staff"
+          - "Agent demanded extortion to confirm pickup"
+        sensitivity_flags: [threat, evidence_preservation]
+
+      - id: legal_threat_against_zomato
+        name: "M13.3 Legal action threat against Zomato"
+        examples:
+          - "Filing FIR against Zomato"
+          - "Taking Zomato to court for losses"
+        sensitivity_flags: [legal_risk, founder_attention]
+        default_audience: [legal, leadership]

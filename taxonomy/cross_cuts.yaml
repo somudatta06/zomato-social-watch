@@ -1,0 +1,240 @@
+# Cross-cut axes — orthogonal dimensions tagged on EVERY post.
+#
+# These are independent of the topic taxonomy. Same topic + different
+# cross-cut values = different action. Example: a complaint (negative
+# sentiment) from a journalist (tier-1 author) is treated entirely
+# differently from the same complaint from an anonymous regular user.
+#
+# Schema:
+#   axis           — unique id, used in classifier output
+#   description    — what the axis represents
+#   values         — enum (display name + machine id + when_to_apply)
+#   downstream_use — short note on which Layer 6 rules consume this
+
+axes:
+
+  - axis: side
+    description: "Which side of the marketplace the post is about."
+    values:
+      - {id: consumer, name: Consumer-side}
+      - {id: merchant, name: Merchant-side}
+      - {id: both, name: Both / disputed-incident}
+      - {id: neither, name: Out-of-scope (Blinkit, Eternal corporate, etc.)}
+    downstream_use: |
+      Drives WHICH taxonomy is applied (consumer.yaml vs merchant.yaml).
+      `both` triggers disputed_incident flag in Layer 5.
+      `neither` posts skip topic classification but stay in DB tagged
+      out-of-scope for future expansion.
+
+  - axis: sentiment
+    description: "Overall sentiment of the post toward Zomato."
+    values:
+      - {id: positive, name: Positive, when: praise, brand love, gratitude}
+      - {id: negative, name: Negative, when: complaint, frustration, dissatisfaction}
+      - {id: neutral, name: Neutral, when: factual, informational, news}
+      - {id: mixed, name: Mixed, when: both positive and negative claims in same post}
+      - {id: abusive, name: Abusive, when: profanity, slurs, low-effort hate}
+      - {id: sarcastic, name: Sarcastic, when: surface-positive but actually negative}
+    downstream_use: |
+      Layer 6 auto_action_safe gate: only `negative` (with appropriate
+      severity) and `positive` get auto-actions. `abusive` and `sarcastic`
+      always route to human review.
+
+  - axis: tone_flags
+    description: "Sensitivity-relevant tone markers (multi-select)."
+    values:
+      - {id: accusation, name: Accusation, when: post asserts wrongdoing}
+      - {id: threat, name: Threat, when: explicit threat to person, brand, or platform}
+      - {id: profanity, name: Profanity, when: profane language present}
+      - {id: religious, name: Religious framing, when: religion referenced as basis}
+      - {id: caste, name: Caste reference, when: caste mentioned}
+      - {id: gender, name: Gender slur or framing, when: gender-based slur or claim}
+      - {id: political, name: Political, when: political party / figure / narrative}
+      - {id: satirical, name: Satirical, when: parody, joke, meme format}
+      - {id: factual, name: Factual, when: presented as objective news / data}
+      - {id: religious_language, name: Religious language used as narrative device}
+      - {id: viral_framing, name: Hashtag/CTA designed for amplification}
+    downstream_use: |
+      Any of {religious, caste, gender, threat} → requires_human_review,
+      regardless of confidence or topic. Auto-action blocked.
+
+  - axis: urgency
+    description: "Combined topic + tripwire + tone urgency."
+    values:
+      - {id: critical, name: Critical, sla: act_within_1_hour}
+      - {id: high, name: High, sla: act_within_today}
+      - {id: medium, name: Medium, sla: act_within_week}
+      - {id: low, name: Low, sla: track_only}
+    score_field: urgency_score
+    score_range: [0.0, 1.0]
+    score_to_band:
+      critical: ">= 0.85"
+      high: "0.6 – 0.85"
+      medium: "0.3 – 0.6"
+      low: "< 0.3"
+    downstream_use: |
+      Drives queue priority and SLA timer. `critical` triggers Slack
+      alert (Phase 3). Tripwires force urgency to `critical`
+      regardless of LLM output.
+
+  - axis: audience
+    description: "Which Zomato team(s) this post routes to (multi-select)."
+    values:
+      - {id: customer-care,           name: Customer Care (frontline)}
+      - {id: customer-care-leadership, name: Customer Care leadership}
+      - {id: merchant-ops,            name: Merchant Ops}
+      - {id: merchant-onboarding,     name: Merchant Onboarding}
+      - {id: merchant-success,        name: Merchant Success / KAM}
+      - {id: kam,                     name: KAM (specific account manager)}
+      - {id: trust-safety,            name: Trust & Safety}
+      - {id: safety,                  name: Safety incident response}
+      - {id: legal,                   name: Legal}
+      - {id: pr,                      name: PR / Comms}
+      - {id: marketing,               name: Marketing}
+      - {id: eng,                     name: Engineering (consumer app)}
+      - {id: merchant-eng,            name: Engineering (merchant app)}
+      - {id: merchant-product,        name: Merchant Product team}
+      - {id: product,                 name: Consumer Product team}
+      - {id: finance,                 name: Finance}
+      - {id: ir,                      name: Investor Relations}
+      - {id: ads-team,                name: Ads team}
+      - {id: ranking-team,            name: Search/Ranking team}
+      - {id: trust-safety,            name: Trust & Safety}
+      - {id: regulatory-compliance,   name: Regulatory Compliance}
+      - {id: hr,                      name: HR}
+      - {id: founder-office,          name: Founder Office}
+      - {id: leadership,              name: Senior Leadership}
+      - {id: qa,                      name: Customer Care QA}
+      - {id: intel,                   name: Competitive Intel}
+      - {id: ops,                     name: City Ops}
+      - {id: delivery-ops,            name: Delivery Ops}
+      - {id: restaurant-ops,          name: Restaurant Ops}
+      - {id: none,                    name: No team — track only / dismiss}
+    downstream_use: |
+      Each team's queue surfaces only posts routed to it. Multi-team
+      posts appear in multiple queues with team-specific role context.
+
+  - axis: author_role
+    description: "What kind of account is posting (best-guess inference)."
+    values:
+      - {id: consumer_heavy_user,    name: Consumer (heavy user, mentions frequency)}
+      - {id: consumer_first_timer,   name: Consumer (new account / sparse history)}
+      - {id: consumer_anonymous,     name: Consumer (pseudonymous, no PII)}
+      - {id: merchant_owner_small,   name: Merchant (single restaurant owner)}
+      - {id: merchant_owner_chain,   name: Merchant (multi-outlet chain)}
+      - {id: merchant_employee,      name: Merchant (employee of restaurant)}
+      - {id: delivery_partner,       name: Delivery partner / gig rider}
+      - {id: journalist,             name: Journalist / press}
+      - {id: politician,             name: Politician / govt handle}
+      - {id: influencer_food,        name: Food-niche influencer (>10K followers)}
+      - {id: influencer_general,     name: General influencer (>100K followers)}
+      - {id: competitor_employee,    name: Suspected competitor employee}
+      - {id: ex_employee_zomato,     name: Self-declared ex-Zomato employee}
+      - {id: bot_suspected,          name: Suspected bot (behavioral)}
+      - {id: bot_branded,            name: Verified branded automation (NewsBot etc.)}
+      - {id: unknown,                name: Insufficient signal}
+    downstream_use: |
+      Author role drives reply tone, escalation path, confidence bar,
+      and auto-action gating. competitor_employee + ex_employee never
+      get auto-replies.
+
+  - axis: author_influence
+    description: "Reach tier of the author."
+    values:
+      - {id: tier-1, name: ">1M followers OR verified press OR politician"}
+      - {id: tier-2, name: "10K – 1M followers"}
+      - {id: tier-3, name: "<10K followers"}
+      - {id: unknown, name: "Cannot determine"}
+    downstream_use: |
+      Tier-1 escalates to PR + founder regardless of topic.
+      Tier-3 follows topic-default routing.
+
+  - axis: format
+    description: "What kind of post this is, structurally."
+    values:
+      - {id: complaint,        name: Direct complaint about a specific incident}
+      - {id: question,         name: Question (looking for answer/help)}
+      - {id: review,           name: Review (rating an experience)}
+      - {id: news,             name: News / report (third-party reporting)}
+      - {id: meme,             name: Meme / joke}
+      - {id: opinion,          name: General opinion / commentary}
+      - {id: threat,           name: Threat (legal, social, physical)}
+      - {id: promotion_spam,   name: Referral codes, promo spam, off-topic}
+      - {id: testimonial,      name: Positive testimonial / praise}
+      - id: solidarity_call
+        name: "Anyone else dealing with this? — coordination signal"
+    downstream_use: |
+      promotion_spam → dismiss as noise.
+      meme + sarcastic → never auto-reply.
+      solidarity_call → cluster_lead candidate.
+      news → PR awareness.
+
+  - axis: geography
+    description: "Geographic granularity of the post."
+    values:
+      - {id: point,         name: "Address-level (e.g., 'Indiranagar, Bangalore — 5th Block')"}
+      - {id: neighborhood,  name: "Neighborhood-level (e.g., 'Indiranagar')"}
+      - {id: city,          name: "City-level (e.g., 'Bangalore')"}
+      - {id: state,         name: "State-level"}
+      - {id: country,       name: "India / national"}
+      - {id: multi,         name: "Multi-region claim"}
+      - {id: international, name: "Outside India"}
+      - {id: unknown,       name: "Not stated"}
+    downstream_use: |
+      city / point granularity → city ops dashboard.
+      international → diaspora PR awareness (rare but disproportionate).
+      Granularity itself is a legitimacy signal: more specific = more
+      likely a real incident.
+
+  - axis: lifecycle
+    description: "Where in the engagement journey this post sits."
+    values:
+      - {id: first_mention,         name: First time we see this issue from this handle}
+      - {id: repeat_handle,         name: Same handle, prior posts on file}
+      - {id: follow_up_after_reply, name: We replied; user is following up}
+      - {id: resolved_thanks,       name: User signaled resolution + gratitude}
+      - {id: resolved_unhappy,      name: Issue resolved but user dissatisfied with the journey}
+      - {id: re_flared,             name: Old (>30 days) issue resurfacing now}
+      - {id: archive_resurface,     name: Old tweet (>30 days old) being amplified now (viral revival)}
+    downstream_use: |
+      first_mention → standard triage.
+      repeat_handle / follow_up_after_reply → escalate priority, surface
+      conversation history.
+      resolved_thanks → mine for testimonial, mark closed.
+      archive_resurface + viral_velocity tripwire → PR war room.
+
+# ============================================================
+# Severity tiers (referenced from per-leaf severity_rubric in
+# consumer.yaml / merchant.yaml). Standardized scale across all leaves
+# so reviewers / dashboards see consistent meaning.
+# ============================================================
+
+severity_tiers:
+  - id: L1
+    name: Trivial / track only
+    description: |
+      Mild dissatisfaction; no specific incident; not actionable as
+      complaint. Track for sentiment trend.
+  - id: L2
+    name: Minor / standard reply
+    description: |
+      Specific incident with low impact (e.g., 15 min late delivery).
+      Standard apology / acknowledgement reply. Auto-action eligible if
+      other gates pass.
+  - id: L3
+    name: Significant / requires offer
+    description: |
+      Real impact (e.g., wrong items, >45 min delay). Reply must include
+      concrete offer (refund / replacement / DM for resolution).
+      Auto-action eligible.
+  - id: L4
+    name: Severe / leadership-aware
+    description: |
+      Public call-out, high engagement, sensitive content, or
+      pattern-of-three (third repeat from this handle). Routes to team
+      leadership. Auto-action blocked.
+  - id: L5
+    name: Crisis / founder-office
+    description: |
+      Tripwire-fired, viral velocity, threats, or systemic risk.
+      Founder office aware. Manual response only after legal/PR clearance.

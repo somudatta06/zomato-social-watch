@@ -1,0 +1,257 @@
+{% import '_icons.html' as icons %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Briefing · Zomato Social Watch</title>
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23E23744'/></svg>">
+<script src="https://cdn.tailwindcss.com?plugins=forms,line-clamp"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          primary:'#4F46E5', primary2:'#6366F1', ink:'#0F172A',
+          muted:'#64748B', subtle:'#F8FAFC', line:'#E2E8F0', zomato:'#E23744',
+        },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','-apple-system','Segoe UI','Roboto','sans-serif'] },
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://rsms.me/">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+  html { font-feature-settings:'cv11','ss01','ss03'; }
+  body { font-family:'Inter',system-ui,sans-serif; }
+  .scroll-area::-webkit-scrollbar { width:8px; height:8px; }
+  .scroll-area::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:4px; }
+  .scroll-area::-webkit-scrollbar-track { background:transparent; }
+  .nav-item.active { background:#EEF2FF; color:#4338CA; }
+  .nav-item.active .nav-icon { color:#4F46E5; }
+  details > summary { list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+</style>
+</head>
+<body class="h-screen bg-subtle text-ink">
+
+<div class="flex h-screen overflow-hidden">
+  {% include '_sidebar.html' %}
+  <main class="flex-1 overflow-y-auto scroll-area">
+
+    <header class="bg-white border-b border-line px-8 py-5 flex items-center sticky top-0 z-10">
+      <div>
+        <h1 class="text-[22px] font-semibold tracking-tight">Daily briefing</h1>
+        <div class="text-[13px] text-muted mt-0.5">
+          {{ brief.window|capitalize }} of activity. Generated {{ now }}.
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <a href="/" class="text-[12px] text-muted hover:text-ink flex items-center gap-1">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to Home
+        </a>
+        <button onclick="window.location.reload()" class="px-3 py-1.5 rounded-md border border-line text-ink hover:bg-subtle text-[12px] flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+        </button>
+      </div>
+    </header>
+
+    {% set k = brief.key_metrics %}
+    {% set delta = k.delta_pct_vs_yesterday %}
+
+    <div class="max-w-[1600px] mx-auto px-6 xl:px-10 pt-6 pb-12">
+
+      {# ── Headline. The first thing the CMO reads. Constrained for prose readability. ── #}
+      <section class="mb-6">
+        <p class="text-[10px] font-semibold tracking-[0.2em] uppercase text-muted mb-3">Top of mind</p>
+        <h2 class="text-[26px] font-semibold tracking-tight leading-snug text-ink max-w-3xl">
+          {{ brief.headline }}
+        </h2>
+      </section>
+
+      {# ── Key metrics row. Four big numbers. Full width. ── #}
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-6 pt-6 pb-6 mb-8 border-t border-b border-line/60">
+        <div>
+          <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none">{{ k.mentions_today }}</div>
+          <div class="mt-2 text-[12.5px] text-muted">Mentions today</div>
+          <div class="text-[11.5px] text-muted/70 mt-0.5">
+            {% if delta > 0.5 %}
+              <span class="text-rose-600">up {{ '%.0f'|format(delta) }}%</span> vs yesterday
+            {% elif delta < -0.5 %}
+              <span class="text-emerald-600">down {{ '%.0f'|format(delta|abs) }}%</span> vs yesterday
+            {% else %}
+              flat vs yesterday
+            {% endif %}
+          </div>
+        </div>
+        <div>
+          <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none {% if k.p0_today %}text-red-600{% else %}text-muted/40{% endif %}">{{ k.p0_today }}</div>
+          <div class="mt-2 text-[12.5px] text-muted">Critical now</div>
+          <div class="text-[11.5px] text-muted/70 mt-0.5">Reply within 15 min</div>
+        </div>
+        <div>
+          <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none {% if k.overdue_now >= 50 %}text-red-600{% elif k.overdue_now >= 20 %}text-amber-700{% else %}text-muted/60{% endif %}">{{ k.overdue_now }}</div>
+          <div class="mt-2 text-[12.5px] text-muted">Overdue right now</div>
+          <div class="text-[11.5px] text-muted/70 mt-0.5">Critical &amp; High waiting &gt;2h</div>
+        </div>
+        <div>
+          <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none {% if k.reply_rate_pct >= 50 %}text-emerald-600{% else %}text-ink{% endif %}">{{ k.reply_rate_pct|round|int }}%</div>
+          <div class="mt-2 text-[12.5px] text-muted">Reply rate</div>
+          <div class="text-[11.5px] text-muted/70 mt-0.5">{{ k.replied_today }} replied today</div>
+        </div>
+      </section>
+
+      {# ── Body grid. Three columns of context, density-tuned for the CMO morning glance. ── #}
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-10">
+
+        {# ── COL 1: Risks (the priority list — left column, biggest weight). ── #}
+        <div class="min-w-0">
+          {% if brief.top_risks %}
+          <div class="flex items-baseline gap-3 pb-3 mb-4 border-b border-line/60">
+            <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">What needs attention</h2>
+            <span class="ml-auto text-[12px] tabular-nums text-muted">{{ brief.top_risks|length }}</span>
+          </div>
+          <ol class="space-y-1">
+            {% for risk in brief.top_risks %}
+            <li>
+              <a href="{{ risk.link }}" class="group flex items-start gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-white transition-colors">
+                <span class="text-muted/50 text-[13px] tabular-nums w-5 flex-shrink-0 mt-0.5">{{ loop.index }}.</span>
+                <p class="text-[13.5px] text-ink/85 leading-relaxed flex-1">{{ risk.text }}</p>
+                <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-muted/30 group-hover:text-primary flex-shrink-0 mt-1"></i>
+              </a>
+            </li>
+            {% endfor %}
+          </ol>
+          {% endif %}
+        </div>
+
+        {# ── COL 2: Anomalies + Top themes. ── #}
+        <div class="min-w-0 space-y-10">
+          {% if brief.anomalies %}
+          <div>
+            <div class="flex items-baseline gap-3 pb-3 mb-4 border-b border-line/60">
+              <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">Anomalies detected</h2>
+              <span class="ml-auto text-[12px] tabular-nums text-muted">{{ brief.anomalies|length }}</span>
+            </div>
+            <div class="space-y-1">
+              {% for a in brief.anomalies %}
+              {% set sev_color = {'high':'bg-red-500', 'medium':'bg-amber-500', 'low':'bg-slate-300'} %}
+              <div class="flex items-start gap-3 py-1.5">
+                <span class="w-1.5 h-1.5 mt-2 rounded-full flex-shrink-0 {{ sev_color.get(a.severity, 'bg-slate-300') }}"></span>
+                <p class="text-[13px] text-ink/80 leading-relaxed">{{ a.message }}</p>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if brief.top_themes %}
+          <div>
+            <div class="flex items-baseline gap-3 pb-3 mb-2 border-b border-line/60">
+              <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">Top active themes</h2>
+              <span class="ml-auto text-[12px] tabular-nums text-muted">{{ brief.top_themes|length }}</span>
+            </div>
+            <ul>
+              {% for t in brief.top_themes %}
+              <a href="/inbox?cluster_id={{ t.id }}&page=1" class="block py-2 px-2 -mx-2 rounded-lg hover:bg-white transition-colors group">
+                <div class="flex items-baseline justify-between gap-3">
+                  <span class="text-[13.5px] font-medium truncate">{{ t.name }}</span>
+                  <span class="text-[13px] tabular-nums text-muted flex-shrink-0">{{ t.member_count }}</span>
+                </div>
+                {% if t.summary %}
+                <p class="text-[11.5px] text-muted/80 line-clamp-1 mt-0.5">{{ t.summary[:120] }}</p>
+                {% endif %}
+              </a>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+
+        {# ── COL 3: Emerging themes + Restaurants + Cities. ── #}
+        <div class="min-w-0 space-y-10">
+          {% if brief.emerging_themes %}
+          <div>
+            <div class="flex items-baseline gap-3 pb-3 mb-4 border-b border-line/60">
+              <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">Emerging themes</h2>
+              <span class="ml-auto text-[12px] tabular-nums text-muted">{{ brief.emerging_themes|length }}</span>
+            </div>
+            <p class="text-[11.5px] text-muted mb-3">Themes that didn't exist yesterday and are landing today.</p>
+            <ul class="space-y-0.5">
+              {% for e in brief.emerging_themes %}
+              {% set name_clean = (e.name or 'unnamed')|replace('_', ' ')|title %}
+              {% set link = '/inbox?cluster_id=' ~ e.id ~ '&page=1' if e.id else '/inbox?q=' ~ (e.name or '')|urlencode ~ '&window=day' %}
+              <li>
+                <a href="{{ link }}" class="group flex items-start gap-2.5 py-1.5 px-2 -mx-2 rounded-lg hover:bg-white transition-colors">
+                  <i data-lucide="trending-up" class="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0"></i>
+                  <div class="min-w-0 flex-1 flex items-baseline justify-between gap-2">
+                    <span class="text-[13px] font-medium truncate">{{ name_clean }}</span>
+                    <span class="text-[11.5px] text-muted flex-shrink-0">{{ e.today_count }} new</span>
+                  </div>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          {% if brief.top_restaurants %}
+          <div>
+            <div class="flex items-baseline gap-3 pb-3 mb-2 border-b border-line/60">
+              <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">Top restaurants</h2>
+              <span class="ml-auto text-[12px] tabular-nums text-muted">{{ brief.top_restaurants|length }}</span>
+            </div>
+            <ul>
+              {% for r in brief.top_restaurants %}
+              <li>
+                <a href="/inbox?q={{ r.name|urlencode }}&window=week"
+                   class="group flex items-baseline justify-between gap-3 py-1.5 px-2 -mx-2 rounded-lg hover:bg-white transition-colors">
+                  <span class="text-[13px] truncate">{{ r.name }}</span>
+                  <span class="text-[13px] tabular-nums text-muted flex-shrink-0 group-hover:text-ink">{{ r.count }}</span>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          {% if brief.top_cities %}
+          <div>
+            <div class="flex items-baseline gap-3 pb-3 mb-2 border-b border-line/60">
+              <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">Top cities</h2>
+              <span class="ml-auto text-[12px] tabular-nums text-muted">{{ brief.top_cities|length }}</span>
+            </div>
+            <ul>
+              {% for c in brief.top_cities %}
+              <li>
+                <a href="/inbox?q={{ c.name|urlencode }}&window=week"
+                   class="group flex items-baseline justify-between gap-3 py-1.5 px-2 -mx-2 rounded-lg hover:bg-white transition-colors">
+                  <span class="text-[13px] truncate">{{ c.name }}</span>
+                  <span class="text-[11.5px] text-muted tabular-nums flex-shrink-0">
+                    {{ c.count }} <span class="text-muted/50">·</span>
+                    <span class="{% if c.neg_pct >= 60 %}text-red-600{% elif c.neg_pct >= 40 %}text-amber-700{% else %}text-muted{% endif %}">{{ c.neg_pct }}% neg</span>
+                  </span>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+
+      </section>
+
+      <div class="text-[11px] text-muted/60 text-center mt-12 pt-6 border-t border-line/40">
+        Generated by Zomato Social Watch from the last 24 hours of Reddit and X data.
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+</script>
+</body>
+</html>

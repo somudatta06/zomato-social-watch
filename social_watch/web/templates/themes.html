@@ -1,0 +1,228 @@
+{% import '_icons.html' as icons %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discovery · Zomato Social Watch</title>
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23E23744'/></svg>">
+<script src="https://cdn.tailwindcss.com?plugins=forms,line-clamp"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          primary:  '#4F46E5',
+          primary2: '#6366F1',
+          ink:      '#0F172A',
+          muted:    '#64748B',
+          subtle:   '#F8FAFC',
+          line:     '#E2E8F0',
+          zomato:   '#E23744',
+        },
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        },
+        boxShadow: {
+          card: '0 1px 2px 0 rgba(15,23,42,0.04), 0 1px 3px 0 rgba(15,23,42,0.06)',
+        },
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://rsms.me/">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+  html { font-feature-settings: 'cv11', 'ss01', 'ss03'; }
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .scroll-area::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .nav-item.active { background: #EEF2FF; color: #4338CA; }
+  .nav-item.active .nav-icon { color: #4F46E5; }
+  .pri-P0 { color: #FFFFFF; background: #DC2626; border: 1px solid #B91C1C; font-weight: 600; }
+  .pri-P1 { color: #C2410C; background: #FFEDD5; border: 1px solid #FDBA74; font-weight: 600; }
+  .pri-P2 { color: #1D4ED8; background: #DBEAFE; border: 1px solid #93C5FD; }
+  .pri-P3 { color: #64748B; background: #F1F5F9; border: 1px solid #CBD5E1; }
+  .badge-reddit  { color: #DD4500; background: #FFF1EC; border: 1px solid #FED4C0; }
+  .badge-twitter { color: #1F2937; background: #F1F5F9; border: 1px solid #CBD5E1; }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  .sev-critical { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; }
+  .sev-high     { color: #C2410C; background: #FFF7ED; border: 1px solid #FED7AA; }
+  .sev-medium   { color: #4338CA; background: #EEF2FF; border: 1px solid #C7D2FE; }
+  .sev-low      { color: #475569; background: #F8FAFC; border: 1px solid #E2E8F0; }
+</style>
+</head>
+<body class="h-screen bg-subtle text-ink">
+
+<div class="flex h-screen overflow-hidden">
+
+  {% include '_sidebar.html' %}
+
+  <main class="flex-1 overflow-y-auto scroll-area">
+
+    <!-- Page header -->
+    <header class="bg-white border-b border-line px-8 py-5 flex items-center sticky top-0 z-10">
+      <div>
+        <h1 class="text-[22px] font-semibold tracking-tight">Discovery</h1>
+        <div class="text-[13px] text-muted mt-0.5">
+          {{ all_themes|length }} active complaint themes · what people are saying about Zomato in the last 24 hours
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <a href="/" class="text-[12px] text-muted hover:text-ink flex items-center gap-1">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+          Back to Home
+        </a>
+        <button onclick="window.location.reload()" class="px-3 py-1.5 rounded-md border border-line text-ink hover:bg-subtle text-[12px] flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    {# ============================================================
+       Discovery — Apple-editorial style.
+
+       The whole page sits on a clean canvas. No boxed cards, no
+       severity-coloured rails. Hairline dividers separate sections.
+       Numbers are visually heroic; everything else recedes.
+
+       Hierarchy:
+         1. Big stats row (no boxes — just numbers + tiny labels)
+         2. Hairline
+         3. Section: "Critical" (small uppercase header, generous spacing)
+         4. Themes as plain rows. Severity is a single tiny dot at the
+            start of the row, nothing more.
+         5. Hairline → next section.
+
+       The eye flows: stat → label → section → name → count → click.
+       ============================================================ #}
+    {% set sev_dot = {
+        'critical':'bg-red-500',
+        'high':    'bg-amber-500',
+        'medium':  'bg-indigo-400',
+        'low':     'bg-slate-300',
+    } %}
+    {% set sev_count_fg = {
+        'critical':'text-red-600',
+        'high':    'text-amber-700',
+        'medium':  'text-ink',
+        'low':     'text-muted',
+    } %}
+    {% set sev_col_accent = {
+        'critical':'border-red-200',
+        'high':    'border-amber-200',
+        'medium':  'border-indigo-200',
+        'low':     'border-line',
+    } %}
+    {% set sev_section_label = {
+        'critical': 'Critical',
+        'high':     'High',
+        'medium':   'Medium',
+        'low':      'Low',
+    } %}
+    {% set themes_by_sev = {
+        'critical': all_themes|selectattr('severity', 'eq', 'critical')|list,
+        'high':     all_themes|selectattr('severity', 'eq', 'high')|list,
+        'medium':   all_themes|selectattr('severity', 'eq', 'medium')|list,
+        'low':      all_themes|selectattr('severity', 'eq', 'low')|list,
+    } %}
+    {% set total_posts_in_themes = all_themes|sum(attribute='member_count') %}
+    {% set non_empty_sevs = [] %}
+    {% for s in ['critical','high','medium','low'] %}{% if themes_by_sev[s] %}{% set _ = non_empty_sevs.append(s) %}{% endif %}{% endfor %}
+    {% set xl_cols_class = {1:'xl:grid-cols-1', 2:'xl:grid-cols-2', 3:'xl:grid-cols-3', 4:'xl:grid-cols-4'}.get(non_empty_sevs|length, 'xl:grid-cols-4') %}
+
+    <div class="max-w-[1600px] mx-auto px-6 xl:px-10 pt-6 pb-12">
+
+      {% if all_themes %}
+        {# ── KPI strip. Four numbers, no boxes. ── #}
+        <section class="grid grid-cols-4 gap-x-10 pb-6 mb-6 border-b border-line/60">
+          <div>
+            <div class="text-[40px] font-semibold tracking-tight tabular-nums leading-none">{{ all_themes|length }}</div>
+            <div class="mt-2 text-[12.5px] text-muted">Active themes</div>
+            <div class="text-[11.5px] text-muted/70 mt-0.5">{{ total_posts_in_themes }} posts</div>
+          </div>
+          <div>
+            <div class="text-[40px] font-semibold tracking-tight tabular-nums leading-none {% if themes_by_sev.critical %}text-red-600{% else %}text-muted/40{% endif %}">{{ themes_by_sev.critical|length }}</div>
+            <div class="mt-2 text-[12.5px] text-muted">Critical</div>
+            <div class="text-[11.5px] text-muted/70 mt-0.5">{{ themes_by_sev.critical|sum(attribute='member_count') }} posts</div>
+          </div>
+          <div>
+            <div class="text-[40px] font-semibold tracking-tight tabular-nums leading-none {% if themes_by_sev.high %}text-amber-700{% else %}text-muted/40{% endif %}">{{ themes_by_sev.high|length }}</div>
+            <div class="mt-2 text-[12.5px] text-muted">High</div>
+            <div class="text-[11.5px] text-muted/70 mt-0.5">{{ themes_by_sev.high|sum(attribute='member_count') }} posts</div>
+          </div>
+          <div>
+            <div class="text-[40px] font-semibold tracking-tight tabular-nums leading-none {% if themes_by_sev.medium or themes_by_sev.low %}text-ink{% else %}text-muted/40{% endif %}">{{ (themes_by_sev.medium + themes_by_sev.low)|length }}</div>
+            <div class="mt-2 text-[12.5px] text-muted">Medium &amp; low</div>
+            <div class="text-[11.5px] text-muted/70 mt-0.5">{{ (themes_by_sev.medium|sum(attribute='member_count')) + (themes_by_sev.low|sum(attribute='member_count')) }} posts</div>
+          </div>
+        </section>
+
+        {# ── Severity board. Kanban-style: one column per non-empty severity. ── #}
+        <section class="grid grid-cols-1 md:grid-cols-2 {{ xl_cols_class }} gap-x-8 gap-y-10">
+          {% for sev in non_empty_sevs %}
+            {% set tier_themes = themes_by_sev[sev] %}
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-3 pb-3 mb-3 border-b-2 {{ sev_col_accent.get(sev) }}">
+                <span class="w-2 h-2 rounded-full {{ sev_dot.get(sev) }}"></span>
+                <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">{{ sev_section_label.get(sev) }}</h2>
+                <span class="ml-auto text-[12px] tabular-nums text-muted">{{ tier_themes|length }}</span>
+              </div>
+
+              <div class="space-y-0.5">
+                {% for t in tier_themes %}
+                  {% set lead = t.sample_posts[0] if t.sample_posts else None %}
+                  <a href="/inbox?cluster_id={{ t.id }}&page=1"
+                     class="group block py-3 px-2 -mx-2 rounded-lg hover:bg-white transition-colors">
+                    <div class="flex items-start gap-3">
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-baseline gap-2">
+                          <h3 class="text-[14px] font-semibold tracking-tight truncate">{{ t.display_name }}</h3>
+                        </div>
+                        {% if t.audience %}
+                          <div class="text-[11px] text-muted mt-0.5 truncate">→ {{ t.audience|join(', ') }}</div>
+                        {% endif %}
+                        {% if lead and lead.excerpt %}
+                          <p class="mt-1.5 text-[12.5px] text-ink/70 leading-snug line-clamp-2">{{ lead.excerpt }}</p>
+                          <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted">
+                            <span class="truncate">@{{ (lead.author or 'anon')|replace('@','') }}</span>
+                            {% if t.last_activity_ago %}
+                              <span class="text-muted/40">·</span>
+                              <span class="whitespace-nowrap">{{ t.last_activity_ago }}</span>
+                            {% endif %}
+                          </div>
+                        {% endif %}
+                      </div>
+
+                      <div class="text-right flex-shrink-0 self-start">
+                        <div class="text-[20px] font-semibold tracking-tight tabular-nums leading-none {{ sev_count_fg.get(sev) }}">
+                          {{ t.member_count }}
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </section>
+
+      {% else %}
+        <div class="py-24 text-center">
+          <div class="text-[20px] font-semibold mb-2">No active themes yet</div>
+          <div class="text-[14px] text-muted">Themes appear when 3 or more posts share a complaint pattern within 24 hours.</div>
+        </div>
+      {% endif %}
+
+    </div>
+  </main>
+</div>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+</script>
+</body>
+</html>

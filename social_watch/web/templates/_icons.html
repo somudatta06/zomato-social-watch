@@ -1,0 +1,69 @@
+{# Inline brand SVGs for source logos. Use:
+     {% import '_icons.html' as icons %}
+     {{ icons.source_logo('reddit', size='16', cls='text-[#FF4500]') }}
+     {{ icons.source_logo('twitter', size='15', cls='text-ink') }}
+   The `twitter` source key maps to the X (formerly Twitter) wordmark.
+#}
+
+{%- macro source_logo(source, size='16', cls='') -%}
+  {%- if source == 'reddit' -%}
+  <svg class="{{ cls }}" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="currentColor" aria-label="Reddit" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.01 4.744a1.249 1.249 0 1 1 .015 2.498 1.249 1.249 0 0 1-.015-2.498zm-2.499.748l-.797 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491a1.752 1.752 0 0 1 .744 3.34c.028.168.043.351.043.534 0 2.694-3.13 4.87-7.004 4.87s-7.004-2.176-7.004-4.87c0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12a1.752 1.752 0 0 1 2.961-1.264c1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617c.142-.275.408-.49.708-.61zM9.25 12c-.687 0-1.249.561-1.249 1.25 0 .687.562 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>
+  {%- elif source == 'twitter' or source == 'x' -%}
+  <svg class="{{ cls }}" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="currentColor" aria-label="X" xmlns="http://www.w3.org/2000/svg"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+  {%- endif -%}
+{%- endmacro %}
+
+
+{# ============================================================
+   Urgency chip — plain language replacement for the P0/P1/P2/P3 jargon.
+
+   `band` is the canonical priority code from the DB ("P0".."P3"). The
+   chip renders the human label ("Critical", "High", "Medium", "Low")
+   plus a hierarchical icon and a tooltip with the SLA. Existing
+   `pri-P0..pri-P3` CSS classes continue to drive the colors.
+
+   Mapping is locked in one place so a new product owner can change
+   "Critical" to "Now" or whatever without grepping the whole codebase.
+
+       P0 → Critical · alert-triangle · "reply within 15 min"
+       P1 → High     · alert-circle   · "reply within 2 hours"
+       P2 → Medium   · clock          · "reply by end of day"
+       P3 → Low      · minus          · "informational, no SLA"
+
+   Sizes: 'xs' (compact list rows), 'sm' (default), 'md' (KPI tiles).
+   ============================================================ #}
+{%- macro urgency_chip(band, size='sm', show_icon=True, show_label=True) -%}
+  {%- set b = (band or 'P3')|upper -%}
+  {%- set label_map = {'P0': 'Critical', 'P1': 'High', 'P2': 'Medium', 'P3': 'Low'} -%}
+  {%- set icon_map  = {'P0': 'alert-triangle', 'P1': 'alert-circle', 'P2': 'clock', 'P3': 'minus'} -%}
+  {%- set sla_map   = {
+      'P0': 'Reply within 15 min — wake the team',
+      'P1': 'Reply within 2 hours — team needs to act',
+      'P2': 'Reply by end of day — track in queue',
+      'P3': 'Informational — no reply required',
+  } -%}
+  {%- set sz_map = {
+      'xs': 'text-[9.5px] px-1 py-0 gap-0.5',
+      'sm': 'text-[10.5px] px-1.5 py-0.5 gap-1',
+      'md': 'text-[12px] px-2 py-1 gap-1.5',
+  } -%}
+  {%- set icon_sz_map = {'xs': 'w-2.5 h-2.5', 'sm': 'w-3 h-3', 'md': 'w-3.5 h-3.5'} -%}
+  {%- set label = label_map.get(b, 'Low') -%}
+  {%- set icon  = icon_map.get(b, 'minus') -%}
+  {%- set sla   = sla_map.get(b, '') -%}
+  {%- set sz    = sz_map.get(size, sz_map['sm']) -%}
+  {%- set isz   = icon_sz_map.get(size, icon_sz_map['sm']) -%}
+  <span class="pri-{{ b }} inline-flex items-center rounded font-semibold tracking-wide whitespace-nowrap {{ sz }}"
+        title="{{ label }} ({{ b }}) — {{ sla }}">
+    {%- if show_icon -%}<i data-lucide="{{ icon }}" class="{{ isz }}"></i>{%- endif -%}
+    {%- if show_label -%}{{ label }}{%- else -%}{{ b }}{%- endif -%}
+  </span>
+{%- endmacro %}
+
+
+{# Plain-language label helper, when you only need the word. #}
+{%- macro urgency_label(band) -%}
+  {%- set b = (band or 'P3')|upper -%}
+  {%- set m = {'P0': 'Critical', 'P1': 'High', 'P2': 'Medium', 'P3': 'Low'} -%}
+  {{- m.get(b, 'Low') -}}
+{%- endmacro %}

@@ -1,0 +1,437 @@
+# Tripwires — deterministic safety/legal/PR rules.
+#
+# These run BEFORE the LLM classification. If any tripwire fires:
+#   - urgency forced to "critical"
+#   - audience override applied (additive, not replace)
+#   - LLM cannot DOWNGRADE the urgency or remove the override
+#   - sensitivity flags propagate
+#
+# Detection types:
+#   keywords     — matches any token (case-insensitive) in post text
+#   keyword_pairs — fires only when BOTH tokens of a pair are present
+#                   (cuts down false positives on ambiguous singles)
+#   regex        — full regex match (Python flavour, IGNORECASE)
+#   handles      — exact handle match against curated list
+#   handle_bio   — handle whose bio contains any keyword
+#
+# Adding a new tripwire is a pull-request-level change. Every entry must
+# include: rationale, override block, and at least one real-world test
+# case (text we know SHOULD match).
+
+tripwires:
+
+  # ============================================================
+  - id: food_safety_incident
+    rationale: |
+      Food poisoning, hospitalization, foreign-object claims have asymmetric
+      downside. Health emergencies must reach safety+legal+PR within minutes,
+      regardless of LLM's topic guess. Missing one is a corporate crisis.
+    detection:
+      keywords:
+        - poisoning
+        - food poisoning
+        - hospitalised
+        - hospitalized
+        - hospital
+        - ICU
+        - emergency room
+        - ER visit
+        - vomiting
+        - vomited
+        - allergic reaction
+        - severe allergy
+        - anaphylaxis
+        - foreign object
+      keyword_pairs:
+        - [hair, food]
+        - [glass, food]
+        - [worm, food]
+        - [insect, food]
+        - [bug, food]
+        - [stone, food]
+        - [piece of plastic, food]
+        - [contamination, order]
+        - [sick, after eating]
+        - [poisoned, zomato]
+    override:
+      urgency: critical
+      audience: [trust-safety, legal, pr, founder-office]
+      requires_human_review: true
+      sensitivity_flags: [health, legal_risk, evidence_preservation]
+    test_cases:
+      - "Got food poisoning from yesterday's Zomato order, hospitalized"
+      - "Found a worm in my food, video below"
+      - "Family sick after eating, ER visit confirmed contamination"
+
+  # ============================================================
+  - id: death_claim
+    rationale: |
+      Even a single death claim — true or exaggerated — must reach the
+      founder office within minutes. No public response without legal
+      clearance. Public missteps here are career-defining.
+    detection:
+      keyword_pairs:
+        - [died, zomato]
+        - [death, zomato]
+        - [passed away, zomato]
+        - [killed, zomato]
+        - [died, food]
+        - [death, food]
+        - [passed away, order]
+    override:
+      urgency: critical
+      audience: [trust-safety, legal, pr, founder-office]
+      requires_human_review: true
+      sensitivity_flags: [health, legal_risk, founder_attention, viral_risk]
+    test_cases:
+      - "My father passed away after eating Zomato food"
+      - "Death in family from contaminated meal ordered on Zomato"
+
+  # ============================================================
+  - id: sexual_misconduct
+    rationale: |
+      Sexual harassment / misconduct allegations require trust-safety and
+      legal lead. Public engagement risks revictimization and legal
+      exposure. NEVER auto-reply.
+    detection:
+      keywords:
+        - sexually harassed
+        - sexual harassment
+        - molested
+        - molestation
+        - inappropriate touching
+        - predatory behaviour
+        - stalker
+        - stalking
+      keyword_pairs:
+        - [harassed, agent]
+        - [harassed, delivery]
+        - [inappropriate, agent]
+        - [inappropriate, delivery]
+        - [advances, agent]
+        - [advances, delivery]
+        - [followed, home]
+    override:
+      urgency: critical
+      audience: [trust-safety, legal, pr]
+      requires_human_review: true
+      sensitivity_flags: [sexual, legal_risk, evidence_preservation, dm_only]
+    test_cases:
+      - "Delivery agent harassed me, made inappropriate advances"
+      - "Agent followed me into my home, scared"
+
+  # ============================================================
+  - id: court_fir_legal
+    rationale: |
+      FIR / court / litigation references mean anything we say publicly may
+      become evidence. Legal must clear before any engagement.
+    detection:
+      keywords:
+        - FIR filed
+        - police complaint
+        - court case
+        - filed a case
+        - filed case
+        - taking to court
+        - consumer court
+        - sued zomato
+        - suing zomato
+        - defamation suit
+      keyword_pairs:
+        - [legal action, zomato]
+        - [lawyer, zomato]
+        - [notice, legal]
+    override:
+      urgency: critical
+      audience: [legal, pr]
+      requires_human_review: true
+      action_lock: do_not_engage_publicly_until_legal_clears
+      sensitivity_flags: [legal_risk, evidence_preservation]
+    test_cases:
+      - "Filing an FIR against Zomato delivery agent"
+      - "Taking Zomato to consumer court for refund"
+
+  # ============================================================
+  - id: journalist_handle
+    rationale: |
+      A journalist tweet IS a story being researched. Our response affects
+      the story. PR must draft, never auto.
+    detection:
+      handles:
+        # Indian business/tech press (curated, expand quarterly)
+        - "@reuters"
+        - "@reutersindia"
+        - "@bloomberg"
+        - "@bloombergquint"
+        - "@et_realty"
+        - "@economictimes"
+        - "@livemint"
+        - "@mint"
+        - "@ftcomtech"
+        - "@inc42"
+        - "@yourstory"
+        - "@moneycontrolcom"
+        - "@business_standard"
+        - "@thehindu"
+        - "@indianexpress"
+        - "@toi_business"
+        - "@cnbctv18news"
+      handle_bio:
+        - journalist
+        - reporter
+        - editor at
+        - correspondent
+        - news anchor
+    override:
+      urgency: high
+      audience: [pr, founder-office]
+      requires_human_review: true
+      sensitivity_flags: [press, narrative_risk]
+      action_hint: "PR drafts response. Treat as an interview request."
+    test_cases:
+      - "Tweet from @inc42 asking about Zomato earnings"
+      - "Bio: 'Senior business journalist at Mint'"
+
+  # ============================================================
+  - id: politician_handle
+    rationale: |
+      Political engagement is high-stakes. Founders must approve any
+      response. Different from journalists in that responses can become
+      regulatory or political signals.
+    detection:
+      handles:
+        # Verified senior political handles (curated, expand)
+        - "@narendramodi"
+        - "@AmitShah"
+        - "@PiyushGoyal"
+        - "@nitin_gadkari"
+        - "@RahulGandhi"
+        - "@ArvindKejriwal"
+        - "@CMOMaharashtra"
+        - "@BJP4India"
+        - "@INCIndia"
+        - "@AamAadmiParty"
+      handle_bio:
+        - "Member of Parliament"
+        - "MP, "
+        - "MLA, "
+        - "Minister of"
+        - "Cabinet Minister"
+        - "Lok Sabha"
+        - "Rajya Sabha"
+    override:
+      urgency: critical
+      audience: [pr, founder-office, legal]
+      requires_human_review: true
+      sensitivity_flags: [political, narrative_risk, founder_attention]
+
+  # ============================================================
+  - id: founder_mention
+    rationale: |
+      Posts mentioning Deepinder Goyal or other Zomato founders need
+      founder-office awareness within minutes — strategic, personal, or
+      crisis-shaped.
+    detection:
+      keywords:
+        - "@deepigoyal"
+        - "Deepinder Goyal"
+        - "Deepinder"
+        - "Gaurav Gupta zomato"
+      handles:
+        - "@deepigoyal"
+    override:
+      urgency: high
+      audience: [founder-office, pr]
+      sensitivity_flags: [founder_attention]
+    test_cases:
+      - "Power of compounding explained by Deepinder Goyal through Zomato's journey"
+      - "Hey @deepigoyal please look into this"
+
+  # ============================================================
+  - id: boycott_coordinated
+    rationale: |
+      Coordinated campaigns escalate exponentially. Early detection enables
+      narrative response. The keyword/hashtag list is updated quarterly
+      based on observed campaigns.
+    detection:
+      keywords:
+        - "#LogoutZomato"
+        - "#BoycottZomato"
+        - "#DeleteZomato"
+        - "#UnsubscribeZomato"
+        - "#ZomatoFail"
+        - "boycott zomato"
+        - "delete zomato"
+        - "leaving zomato forever"
+    override:
+      urgency: critical
+      audience: [pr, leadership, founder-office]
+      requires_human_review: true
+      sensitivity_flags: [coordinated_attack, viral_risk]
+      cluster_seed: true   # ALSO triggers cluster detection lookup
+    test_cases:
+      - "#LogoutZomato is trending"
+      - "Time to delete Zomato — boycott!"
+
+  # ============================================================
+  - id: religious_caste_gender_sensitivity
+    rationale: |
+      Public discourse with religious / caste / gender framing has
+      asymmetric downside. Bad replies generate disproportionate damage.
+      Manual PR review only — never auto-reply, regardless of topic.
+      Detection is PAIR-based: a religious/caste term alone is not a
+      tripwire (e.g. "I'm Muslim and I love Zomato" should not fire).
+      It must co-occur with a delivery/agent/restaurant/discrimination
+      context term to qualify as religious framing of an incident.
+    detection:
+      keywords:
+        # Slurs / explicitly inflammatory terms — fire on their own
+        - jihadi
+        - kafir
+        - chaddi
+        # Multi-word phrases — unambiguous on their own
+        - "lower caste"
+        - "upper caste"
+        - "caste based"
+        - "religion based"
+        - "religious discrimination"
+        - "communal violence"
+      keyword_pairs:
+        # Religion + delivery/agent/restaurant context
+        - [religion, agent]
+        - [religion, delivery]
+        - [religion, restaurant]
+        - [muslim, agent]
+        - [muslim, delivery]
+        - [muslim, refuse]
+        - [muslim, refused]
+        - [hindu, agent]
+        - [hindu, delivery]
+        - [hindu, refuse]
+        - [hindu, refused]
+        - [christian, agent]
+        - [christian, delivery]
+        - [sikh, agent]
+        - [sikh, delivery]
+        # Caste + context
+        - [caste, agent]
+        - [caste, delivery]
+        - [caste, restaurant]
+        - [dalit, agent]
+        - [dalit, delivery]
+        - [brahmin, agent]
+        - [brahmin, delivery]
+        # Community / discrimination framing
+        - [community, refused]
+        - [community, denied]
+        - [based on, religion]
+        - [because of, religion]
+        - [because of, caste]
+        - [because of, community]
+    override:
+      urgency: critical
+      audience: [trust-safety, legal, pr, founder-office]
+      requires_human_review: true
+      sensitivity_flags: [religious, caste, viral_risk, narrative_risk]
+      action_lock: manual_pr_review_only
+    test_cases:
+      - "App showed Bal Krishna but actually a Muslim guy came"
+      - "Caste-based remarks from delivery person"
+      - "Religion-based discrimination by agent"
+      - "Refused service because of my religion"
+
+  # ============================================================
+  - id: insider_leak
+    rationale: |
+      Insider claims may be true or fabricated; both cases require legal
+      and HR coordination. Never engage publicly.
+    detection:
+      keywords:
+        - "ex-zomato employee"
+        - "former zomato"
+        - "ex-employee zomato"
+        - "i worked at zomato"
+        - "leaked internal"
+        - "internal memo"
+        - "internal email zomato"
+        - "screenshot of internal"
+      handle_bio:
+        - "ex-Zomato"
+        - "former Zomato employee"
+        - "former @zomato"
+    override:
+      urgency: critical
+      audience: [legal, hr, pr, founder-office]
+      requires_human_review: true
+      sensitivity_flags: [insider_leak, legal_risk, narrative_risk, evidence_preservation]
+    test_cases:
+      - "As an ex-Zomato employee, here's what really happens internally..."
+      - "Leaked internal email shows commission policy"
+
+  # ============================================================
+  - id: anti_competitive_regulatory
+    rationale: |
+      CCI is the regulator that has previously investigated platforms.
+      Anti-competitive allegations route to legal + leadership.
+    detection:
+      keywords:
+        - CCI
+        - "Competition Commission"
+        - antitrust
+        - "anti-competitive"
+        - predatory pricing
+      keyword_pairs:
+        - [exclusivity, zomato]
+        - [predatory, zomato]
+        - [monopoly, zomato]
+    override:
+      urgency: critical
+      audience: [legal, leadership, regulatory-compliance]
+      requires_human_review: true
+      sensitivity_flags: [regulatory, legal_risk, founder_attention]
+    test_cases:
+      - "Reporting Zomato to CCI for predatory pricing"
+      - "Zomato's exclusivity clauses are anti-competitive"
+
+  # ============================================================
+  - id: privacy_data_leak
+    rationale: |
+      Privacy / PII leak claims have legal and regulatory implications
+      (DPDP Act 2023). Treat as breach until proven otherwise.
+    detection:
+      keywords:
+        - "PII leak"
+        - "data leak"
+        - "phone number leaked"
+        - "address leaked"
+        - "personal data exposed"
+        - "DPDP"
+      keyword_pairs:
+        - [leaked, zomato]
+        - [exposed, agents]
+        - [private data, leaked]
+    override:
+      urgency: critical
+      audience: [trust-safety, legal, pr]
+      requires_human_review: true
+      sensitivity_flags: [privacy, legal_risk, regulatory]
+
+  # ============================================================
+  - id: viral_velocity
+    rationale: |
+      Engagement velocity is itself a tripwire — a single tweet with 1000+
+      retweets/likes-per-hour is a PR event regardless of content. Computed
+      after Layer 5 cluster detection but treated as a tripwire-class
+      override.
+    detection:
+      velocity_thresholds:
+        retweets_per_hour: 500
+        likes_per_hour: 2000
+        replies_per_hour: 200
+    override:
+      urgency: critical
+      audience: [pr, founder-office]
+      sensitivity_flags: [viral_risk, narrative_risk]
+
+# Curated lists referenced above are kept inline for v1.
+# Phase 2 may move them to separate handle_list.yaml for easier upkeep.

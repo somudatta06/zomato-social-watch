@@ -1,0 +1,1945 @@
+{% import '_icons.html' as icons %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zomato Social Watch</title>
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23E23744'/></svg>">
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          primary:  '#4F46E5',
+          primary2: '#6366F1',
+          ink:      '#0F172A',
+          muted:    '#64748B',
+          subtle:   '#F8FAFC',
+          line:     '#E2E8F0',
+          zomato:   '#E23744',
+        },
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        },
+        boxShadow: {
+          card: '0 1px 2px 0 rgba(15,23,42,0.04), 0 1px 3px 0 rgba(15,23,42,0.06)',
+        },
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://rsms.me/">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+  html { font-feature-settings: 'cv11', 'ss01', 'ss03'; }
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .scroll-area::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .nav-item.active { background: #EEF2FF; color: #4338CA; }
+  .nav-item.active .nav-icon { color: #4F46E5; }
+  .chip { transition: background 120ms ease, color 120ms ease, border-color 120ms ease; }
+  .chip:hover { background: #F1F5F9; }
+  .chip.active { background: #EEF2FF; color: #4338CA; border-color: #C7D2FE; }
+  .row:hover { background: #FAFBFD; }
+  .urg-critical { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; }
+  .urg-high     { color: #C2410C; background: #FFF7ED; border: 1px solid #FED7AA; }
+  .urg-medium   { color: #1D4ED8; background: #EFF6FF; border: 1px solid #BFDBFE; }
+  .urg-low      { color: #475569; background: #F8FAFC; border: 1px solid #E2E8F0; }
+  /* Priority band badges — visually distinct from urgency, slightly bolder */
+  .pri-P0       { color: #FFFFFF; background: #DC2626; border: 1px solid #B91C1C; font-weight: 600; }
+  .pri-P1       { color: #C2410C; background: #FFEDD5; border: 1px solid #FDBA74; font-weight: 600; }
+  .pri-P2       { color: #1D4ED8; background: #DBEAFE; border: 1px solid #93C5FD; }
+  .pri-P3       { color: #64748B; background: #F1F5F9; border: 1px solid #CBD5E1; }
+  /* Phase γ — Author tier badges. Default tiers (regular/anonymous) get
+     no badge; the badge always means "this author needs special handling". */
+  .tier-authority      { color: #FFFFFF; background: #7C2D12; border: 1px solid #5B2510; font-weight: 600; }
+  .tier-founder        { color: #FFFFFF; background: #BE123C; border: 1px solid #9F1239; font-weight: 600; }
+  .tier-press          { color: #9A3412; background: #FFEDD5; border: 1px solid #FDBA74; font-weight: 600; }
+  .tier-politician     { color: #831843; background: #FCE7F3; border: 1px solid #F9A8D4; font-weight: 600; }
+  .tier-influencer     { color: #6B21A8; background: #F3E8FF; border: 1px solid #D8B4FE; font-weight: 600; }
+  .tier-power_user     { color: #1E40AF; background: #DBEAFE; border: 1px solid #93C5FD; font-weight: 500; }
+  .tier-active_citizen { color: #166534; background: #DCFCE7; border: 1px solid #86EFAC; font-weight: 500; }
+  .tier-bot            { color: #4B5563; background: #F3F4F6; border: 1px solid #D1D5DB; font-weight: 500; }
+  .badge-reddit { color: #DD4500; background: #FFF1EC; border: 1px solid #FED4C0; }
+  .badge-twitter { color: #1F2937; background: #F1F5F9; border: 1px solid #CBD5E1; }
+  .badge-tw { color: #B91C1C; background: #FEF2F2; border: 1px solid #FECACA; font-size: 11px; }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+<body class="h-screen bg-subtle text-ink">
+
+<div class="flex h-screen overflow-hidden">
+
+  {# Slim shared sidebar lives in _sidebar.html — included by both
+     pulse.html and dashboard.html so navigation stays in lockstep. #}
+  {% include '_sidebar.html' %}
+
+
+  <!-- ============================================================= -->
+  <!-- MAIN                                                            -->
+  <!-- ============================================================= -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- HEADER -->
+    <header class="h-16 px-6 flex items-center bg-white border-b border-line flex-shrink-0">
+      <div class="flex items-center gap-3">
+        {% set noise_labels = {'promo':'Promo & spam','job':'Jobs & hiring','stock':'Stock chatter','off_topic':'Off-topic','bot':'Bots & low-effort'} %}
+        {% if filters.noise and filters.noise != 'all' %}
+          <a href="/inbox" class="flex items-center gap-1 text-[12.5px] text-muted hover:text-ink" title="Clear noise filter">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+            Inbox
+          </a>
+          <span class="text-muted/40">/</span>
+          <h1 class="text-[18px] font-semibold tracking-tight">{{ noise_labels.get(filters.noise, filters.noise|title) }}</h1>
+        {% else %}
+          <h1 class="text-[18px] font-semibold tracking-tight">
+            {% if active_cluster_focus %}Cluster{% else %}Inbox{% endif %}
+          </h1>
+        {% endif %}
+        <span class="text-[12px] text-muted" title="Posts matching the current filters">
+          {% if pagination.total_filtered %}
+            {{ pagination.from_idx }}–{{ pagination.to_idx }} of {{ pagination.total_filtered }}
+          {% else %}
+            0 results
+          {% endif %}
+        </span>
+        {% if active_cluster_focus %}
+          <!-- Cluster focus chip — shows the active cluster + click X to clear -->
+          <div class="flex items-center gap-2 px-2.5 py-1 rounded-md border border-indigo-200 bg-indigo-50 text-[12px]">
+            <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-700"></i>
+            <span class="font-medium text-indigo-900 truncate max-w-[280px]" title="{{ active_cluster_focus.summary }}">
+              {{ active_cluster_focus.primary_topic }} · {{ active_cluster_focus.geography|title }}
+            </span>
+            <span class="text-indigo-700">{{ active_cluster_focus.member_count }} posts</span>
+            <a href="{{ link(cluster_id='', page=1) }}" class="text-indigo-700 hover:text-indigo-900" title="Clear cluster filter">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+        {% endif %}
+        <!-- Activity strip: at-a-glance freshness so users know what's recent -->
+        <div class="hidden md:flex items-center gap-3 ml-3 pl-3 border-l border-line text-[11.5px]">
+          <div class="flex items-center gap-1.5" title="Posts created in the last hour">
+            <span class="w-1.5 h-1.5 rounded-full {% if counts.last_hour > 0 %}bg-emerald-500 animate-pulse{% else %}bg-slate-300{% endif %}"></span>
+            <span class="text-muted">Last hour</span>
+            <span class="font-semibold text-ink">{{ counts.last_hour }}</span>
+          </div>
+          <div class="flex items-center gap-1.5" title="Posts created in the last 24 hours">
+            <span class="text-muted">Today</span>
+            <span class="font-semibold text-ink">{{ counts.last_24h }}</span>
+          </div>
+          {% if counts.stale > 0 %}
+            <div class="flex items-center gap-1.5 text-amber-700" title="Critical or High urgency posts sitting more than 2 hours without a response">
+              <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+              <span>Overdue:</span>
+              <span class="font-semibold">{{ counts.stale }}</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-1.5">
+        <button class="w-8 h-8 rounded-md hover:bg-subtle flex items-center justify-center text-muted" title="Settings">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+        <button onclick="window.location.reload()" class="w-8 h-8 rounded-md hover:bg-subtle flex items-center justify-center text-muted" title="Refresh">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+        <button class="w-8 h-8 rounded-md hover:bg-subtle flex items-center justify-center text-muted relative" title="Notifications">
+          <i data-lucide="bell" class="w-4 h-4"></i>
+          {% if counts.critical > 0 %}<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>{% endif %}
+        </button>
+        <div class="h-6 w-px bg-line mx-1.5"></div>
+        <div class="flex items-center gap-2 text-[13px]">
+          <div class="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[11px] font-semibold">FZ</div>
+          <span class="font-medium hidden sm:inline">forzomato</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- FILTER BAR — Anthropic-Console style.
+         Left:  segmented control for the primary lens (All/Consumer/Merchant/Disputed)
+         Right: time window · sort · "+ Filter" popover · search
+         Below: active-filter pills row, only renders when any popover filter is active.
+         Visual hierarchy: ONE element draws the eye (segmented), everything else
+         is subdued. Counts are shown only on the segmented control's tabs because
+         that's the only place a count answers an actionable question. -->
+    <section class="px-6 py-2.5 bg-white border-b border-line flex-shrink-0">
+      <form method="get" id="filterForm" class="flex items-center gap-3 flex-wrap">
+
+        <!-- Segmented: primary lens -->
+        <div class="inline-flex items-center bg-subtle/70 border border-line/80 rounded-lg p-0.5 text-[12.5px]">
+          {% set seg_active = "bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06)] text-ink font-semibold" %}
+          {% set seg_idle = "text-muted hover:text-ink" %}
+          <a href="{{ link(side='all', urgency='all', tripwires=0, response='all', overdue=False, author_tier='', cluster_id='') }}"
+             class="px-3 py-1 rounded-md transition-colors {% if filters.side == 'all' and filters.urgency == 'all' and not filters.tripwires and (filters.response or 'all') == 'all' and not filters.overdue and not filters.author_tier and not filters.cluster_id %}{{ seg_active }}{% else %}{{ seg_idle }}{% endif %}">
+            All <span class="text-muted/80 ml-1 tabular-nums">{{ counts.total }}</span>
+          </a>
+          <a href="{{ link(side='consumer', urgency='all', tripwires=0) }}"
+             class="px-3 py-1 rounded-md transition-colors {% if filters.side == 'consumer' %}{{ seg_active }}{% else %}{{ seg_idle }}{% endif %}">
+            Consumer <span class="text-muted/80 ml-1 tabular-nums">{{ counts.by_side.get('consumer', 0) }}</span>
+          </a>
+          <a href="{{ link(side='merchant', urgency='all', tripwires=0) }}"
+             class="px-3 py-1 rounded-md transition-colors {% if filters.side == 'merchant' %}{{ seg_active }}{% else %}{{ seg_idle }}{% endif %}">
+            Merchant <span class="text-muted/80 ml-1 tabular-nums">{{ counts.by_side.get('merchant', 0) }}</span>
+          </a>
+          {% if counts.by_side.get('both', 0) > 0 %}
+          <a href="{{ link(side='both', urgency='all', tripwires=0) }}"
+             class="px-3 py-1 rounded-md transition-colors {% if filters.side == 'both' %}{{ seg_active }}{% else %}{{ seg_idle }}{% endif %}">
+            Disputed <span class="text-muted/80 ml-1 tabular-nums">{{ counts.by_side.get('both', 0) }}</span>
+          </a>
+          {% endif %}
+        </div>
+
+        <!-- Right cluster: utilities. Pinned right. -->
+        <div class="ml-auto flex items-center gap-1.5">
+
+          {# Time window dropdown.
+             Calendar presets (Today / Yesterday) come first because that's
+             how operators talk about time. Rolling presets (Last 24h / 7d /
+             30d) follow for monitoring use cases. Custom range expands
+             inline with two date inputs and an Apply button. #}
+          {% set window_label = {
+              'today':     'Today',
+              'yesterday': 'Yesterday',
+              'hour':      'Last hour',
+              'day':       'Last 24 hours',
+              'week':      'Last 7 days',
+              'month':     'Last 30 days',
+              'all':       'All time',
+          } %}
+          <details class="relative" id="windowMenu">
+            <summary class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] text-muted hover:text-ink hover:bg-subtle transition-colors select-none">
+              <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+              <span>
+                {% if filters.window == 'custom' and filters.from %}
+                  {{ filters.from }}{% if filters.to and filters.to != filters.from %} to {{ filters.to }}{% endif %}
+                {% else %}
+                  {{ window_label.get(filters.window, 'Today') }}
+                {% endif %}
+              </span>
+              <i data-lucide="chevron-down" class="w-3 h-3"></i>
+            </summary>
+            <div class="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-lg shadow-card text-[13px] z-20 w-60 py-1.5">
+              {% for v, label in [
+                  ('today',     'Today'),
+                  ('yesterday', 'Yesterday'),
+                  ('day',       'Last 24 hours'),
+                  ('week',      'Last 7 days'),
+                  ('month',     'Last 30 days'),
+                  ('all',       'All time'),
+              ] %}
+                <a href="{{ link(window=v) }}" class="flex items-center justify-between px-3 py-1.5 hover:bg-subtle {% if filters.window == v %}font-semibold text-primary{% endif %}">
+                  <span>{{ label }}</span>
+                  {% if filters.window == v %}<i data-lucide="check" class="w-3.5 h-3.5"></i>{% endif %}
+                </a>
+              {% endfor %}
+
+              <div class="border-t border-line/60 my-1.5"></div>
+
+              {# Custom range. Two date inputs + Apply. The whole thing is
+                 a tiny standalone form that POSTs window=custom + from/to. #}
+              <div class="px-3 py-1">
+                <div class="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Custom range</div>
+                <form action="/inbox" method="get" class="space-y-1.5">
+                  <label class="block">
+                    <span class="text-[11px] text-muted">From</span>
+                    <input type="date" name="from" value="{{ filters.from }}"
+                           class="mt-0.5 w-full px-2 py-1 text-[12px] border border-line rounded focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary">
+                  </label>
+                  <label class="block">
+                    <span class="text-[11px] text-muted">To</span>
+                    <input type="date" name="to" value="{{ filters.to }}"
+                           class="mt-0.5 w-full px-2 py-1 text-[12px] border border-line rounded focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary">
+                  </label>
+                  <input type="hidden" name="window" value="custom">
+                  {# Preserve other active filters when applying a custom range #}
+                  {% for k, v in filters.items() if k not in ('window', 'from', 'to', 'page') %}
+                    {% if v not in (None, '', False, 'all', 0) %}
+                      <input type="hidden" name="{{ k }}" value="{{ v|string|lower if v is sameas true else v }}">
+                    {% endif %}
+                  {% endfor %}
+                  <button type="submit" class="w-full mt-1 px-2 py-1 text-[12px] font-medium text-white bg-ink hover:bg-ink/90 rounded">
+                    Apply
+                  </button>
+                </form>
+              </div>
+            </div>
+          </details>
+
+          <!-- Sort -->
+          <details class="relative">
+            <summary class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] text-muted hover:text-ink hover:bg-subtle transition-colors">
+              <i data-lucide="arrow-up-down" class="w-3.5 h-3.5"></i>
+              <span>
+                {% if filters.sort == 'priority' %}Priority
+                {% elif filters.sort == 'score' %}Urgency
+                {% elif filters.sort == 'created' %}Recency
+                {% elif filters.sort == 'author' %}Author{% else %}Priority{% endif %}
+              </span>
+              <i data-lucide="chevron-down" class="w-3 h-3"></i>
+            </summary>
+            <div class="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-md shadow-card text-[13px] z-20 w-52 py-1">
+              <a href="{{ link(sort='priority') }}" class="block px-3 py-1.5 hover:bg-subtle {% if filters.sort == 'priority' %}font-semibold text-primary{% endif %}">Priority (P0 first)</a>
+              <a href="{{ link(sort='score') }}" class="block px-3 py-1.5 hover:bg-subtle {% if filters.sort == 'score' %}font-semibold text-primary{% endif %}">Urgency</a>
+              <a href="{{ link(sort='created') }}" class="block px-3 py-1.5 hover:bg-subtle {% if filters.sort == 'created' %}font-semibold text-primary{% endif %}">Recency</a>
+              <a href="{{ link(sort='author') }}" class="block px-3 py-1.5 hover:bg-subtle {% if filters.sort == 'author' %}font-semibold text-primary{% endif %}">Author</a>
+            </div>
+          </details>
+
+          <!-- Filter popover -->
+          {% set ns = namespace(count=0) %}
+          {% if filters.urgency != 'all' %}{% set ns.count = ns.count + 1 %}{% endif %}
+          {% if filters.tripwires %}{% set ns.count = ns.count + 1 %}{% endif %}
+          {% if (filters.response or 'all') != 'all' %}{% set ns.count = ns.count + 1 %}{% endif %}
+          {% if filters.author_tier %}{% set ns.count = ns.count + 1 %}{% endif %}
+          {% if (filters.source or 'all') != 'all' %}{% set ns.count = ns.count + 1 %}{% endif %}
+          {% if filters.overdue %}{% set ns.count = ns.count + 1 %}{% endif %}
+          {% set has_secondary = ns.count > 0 %}
+          <details class="relative">
+            <summary class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] {% if has_secondary %}bg-indigo-50 text-indigo-700 border border-indigo-200{% else %}text-muted hover:text-ink hover:bg-subtle border border-transparent{% endif %} transition-colors">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+              <span>Filter{% if has_secondary %} ({{ ns.count }}){% endif %}</span>
+            </summary>
+            <div class="absolute top-full right-0 mt-1.5 bg-white border border-line rounded-lg shadow-card z-20 w-72 py-2">
+              <!-- Severity -->
+              <div class="px-3 py-1">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1">Severity</div>
+                <a href="{{ link(urgency='critical', side='all', tripwires=0) }}" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-subtle text-[13px] {% if filters.urgency == 'critical' %}font-semibold text-primary{% endif %}">
+                  <i data-lucide="flame" class="w-3.5 h-3.5"></i>
+                  <span>Critical only</span>
+                  <span class="ml-auto text-[11.5px] text-muted tabular-nums">{{ counts.critical }}</span>
+                </a>
+                <a href="{{ link(tripwires=1, side='all', urgency='all') }}" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-subtle text-[13px] {% if filters.tripwires %}font-semibold text-primary{% endif %}">
+                  <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                  <span>Auto-escalated</span>
+                  <span class="ml-auto text-[11.5px] text-muted tabular-nums">{{ counts.tripwires }}</span>
+                </a>
+              </div>
+              <!-- Reply status -->
+              <div class="px-3 py-1 border-t border-line/60 mt-1">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1 mt-1">Reply status</div>
+                <a href="{{ link(response='awaiting') }}" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-subtle text-[13px] {% if filters.response == 'awaiting' %}font-semibold text-primary{% endif %}">
+                  <i data-lucide="message-square-warning" class="w-3.5 h-3.5"></i>
+                  <span>Awaiting Zomato reply</span>
+                  <span class="ml-auto text-[11.5px] text-muted tabular-nums">{{ counts.awaiting_reply }}</span>
+                </a>
+                <a href="{{ link(response='replied') }}" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-subtle text-[13px] {% if filters.response == 'replied' %}font-semibold text-primary{% endif %}">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                  <span>Zomato replied</span>
+                  <span class="ml-auto text-[11.5px] text-muted tabular-nums">{{ counts.replied }}</span>
+                </a>
+              </div>
+              <!-- Source -->
+              <div class="px-3 py-1 border-t border-line/60 mt-1">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1 mt-1">Source</div>
+                <a href="{{ link(source='reddit') }}" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-subtle text-[13px] {% if filters.source == 'reddit' %}font-semibold text-primary{% endif %}">
+                  <span class="w-3.5 h-3.5 inline-flex items-center justify-center text-[#FF4500]">{{ icons.source_logo('reddit', size='14') }}</span>
+                  <span>Reddit only</span>
+                  <span class="ml-auto text-[11.5px] text-muted tabular-nums">{{ counts.by_source.get('reddit', 0) }}</span>
+                </a>
+                <a href="{{ link(source='twitter') }}" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-subtle text-[13px] {% if filters.source == 'twitter' %}font-semibold text-primary{% endif %}">
+                  <span class="w-3.5 h-3.5 inline-flex items-center justify-center text-ink">{{ icons.source_logo('twitter', size='12') }}</span>
+                  <span>X (Twitter) only</span>
+                  <span class="ml-auto text-[11.5px] text-muted tabular-nums">{{ counts.by_source.get('twitter', 0) }}</span>
+                </a>
+              </div>
+              {% if has_secondary %}
+              <div class="px-3 pt-2 mt-1 border-t border-line/60">
+                <a href="{{ link(urgency='all', tripwires=0, response='all', overdue=False, author_tier='', source='all') }}"
+                   class="block text-center text-[12px] text-muted hover:text-rose-600 py-1">Clear all filters</a>
+              </div>
+              {% endif %}
+            </div>
+          </details>
+
+          <!-- Search (icon-style, expands inline on focus) -->
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input type="text" name="q" value="{{ filters.q }}" placeholder="Search…"
+              class="pl-8 pr-2.5 py-1 text-[12.5px] border border-line rounded-md w-44 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:w-72 transition-[width] duration-150">
+          </div>
+          {% for k, v in filters.items() if k not in ['q'] %}
+            <input type="hidden" name="{{ k }}" value="{{ v|string|lower if v is sameas true or v is sameas false else v }}">
+          {% endfor %}
+        </div>
+      </form>
+
+      {# Active-filter pills row — only renders when any "+ Filter" filter is on.
+         Mirrors Linear's pattern: filters live in the popover; removing one is
+         a click on the × in the pill, no need to re-open the menu. #}
+      {% if filters.urgency != 'all' or filters.tripwires or (filters.response or 'all') != 'all' or filters.author_tier or (filters.source or 'all') != 'all' or filters.overdue %}
+      <div class="mt-2 flex items-center gap-1.5 flex-wrap text-[11.5px]">
+        <span class="text-muted">Filtered by:</span>
+        {% if filters.urgency != 'all' %}
+          <a href="{{ link(urgency='all') }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-subtle border border-line hover:border-rose-300 hover:bg-rose-50/50">
+            Urgency: {{ filters.urgency }}
+            <i data-lucide="x" class="w-3 h-3 text-muted"></i>
+          </a>
+        {% endif %}
+        {% if filters.tripwires %}
+          <a href="{{ link(tripwires=0) }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-subtle border border-line hover:border-rose-300 hover:bg-rose-50/50">
+            Auto-escalated
+            <i data-lucide="x" class="w-3 h-3 text-muted"></i>
+          </a>
+        {% endif %}
+        {% if (filters.response or 'all') != 'all' %}
+          <a href="{{ link(response='all') }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-subtle border border-line hover:border-rose-300 hover:bg-rose-50/50">
+            Reply: {{ filters.response }}
+            <i data-lucide="x" class="w-3 h-3 text-muted"></i>
+          </a>
+        {% endif %}
+        {% if filters.overdue %}
+          <a href="{{ link(overdue=False) }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-subtle border border-line hover:border-rose-300 hover:bg-rose-50/50">
+            Overdue (>2h)
+            <i data-lucide="x" class="w-3 h-3 text-muted"></i>
+          </a>
+        {% endif %}
+        {% if (filters.source or 'all') != 'all' %}
+          <a href="{{ link(source='all') }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-subtle border border-line hover:border-rose-300 hover:bg-rose-50/50">
+            Source: {{ filters.source }}
+            <i data-lucide="x" class="w-3 h-3 text-muted"></i>
+          </a>
+        {% endif %}
+        {% if filters.author_tier %}
+          <a href="{{ link(author_tier='') }}" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-subtle border border-line hover:border-rose-300 hover:bg-rose-50/50">
+            Tier: {{ filters.author_tier|capitalize }}
+            <i data-lucide="x" class="w-3 h-3 text-muted"></i>
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- RESULTS LIST -->
+    <section class="flex-1 overflow-y-auto scroll-area">
+      <div class="px-6 py-4">
+
+        {% if not posts %}
+          <div class="bg-white border border-line rounded-lg shadow-card py-16 px-8 text-center">
+            <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-subtle flex items-center justify-center">
+              <i data-lucide="inbox" class="w-5 h-5 text-muted"></i>
+            </div>
+            <div class="text-[15px] font-semibold mb-1">No posts in this view</div>
+            <div class="text-[13px] text-muted">Try widening the time window or clearing filters.</div>
+            <a href="/" class="inline-block mt-4 px-3 py-1.5 text-[13px] font-medium text-primary border border-primary/30 hover:bg-primary/5 rounded-md">Reset filters</a>
+          </div>
+        {% else %}
+          {# overflow-visible (was overflow-hidden) so the per-row ⋯ dropdown
+             menu can extend below the last row without getting clipped.
+             The rounded corners + border-b on each row still look clean —
+             rows are full-width and don't visually overflow the wrapper. #}
+          <div class="bg-white border border-line rounded-lg shadow-card">
+
+            <!-- Table header — column widths must match the row grid below.
+                 1fr (post)  ·  170px (author)  ·  92px (urgency)  ·  72px (posted)  ·  220px (actions) -->
+            <div class="grid grid-cols-[1fr_170px_92px_72px_220px] gap-3 px-5 py-2.5 text-[11.5px] font-semibold uppercase tracking-wider text-muted border-b border-line bg-subtle/40">
+              <div>Post</div>
+              <div>Author / source</div>
+              <div>Urgency</div>
+              <div>Posted</div>
+              <div class="text-right">Actions</div>
+            </div>
+
+            <!-- Rows -->
+            {% for p in posts %}
+              {% set cls = p.cls %}
+              {% set urg = cls.get('urgency', 'low') %}
+              <div class="row grid grid-cols-[1fr_170px_92px_72px_220px] gap-3 px-5 py-3 border-b border-line/60 last:border-0 items-start">
+                <div class="min-w-0">
+                  {% if p.is_new or p.is_stale or p._playbook or p.ack_at %}
+                    <div class="flex items-center gap-1.5 mb-1 flex-wrap">
+                      {% if p.is_new %}
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase tracking-wide" title="Posted in the last hour">
+                          <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                          NEW
+                        </span>
+                      {% endif %}
+                      {% if p.is_stale %}
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold uppercase tracking-wide" title="Critical or High urgency post that's been sitting >2 hours without anyone responding to it">
+                          <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
+                          OVERDUE
+                        </span>
+                      {% endif %}
+                      {# ── Ack pill / live countdown for tripwired posts ── #}
+                      {% if p._playbook and p.ack_at %}
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase tracking-wide"
+                              title="Acknowledged by {{ p.ack_by }} at {{ p.ack_at[:19].replace('T',' ') }} UTC">
+                          <i data-lucide="check-circle-2" class="w-2.5 h-2.5"></i>
+                          ACK · @{{ p.ack_by }}
+                        </span>
+                      {% elif p._playbook and p.ack_deadline_at %}
+                        <span class="ack-countdown inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold uppercase tracking-wide"
+                              data-ack-deadline="{{ p.ack_deadline_at }}"
+                              title="Acknowledgment SLA — {{ p._playbook.ack_deadline_min }} min from first action. Click Acknowledge below to take ownership.">
+                          <i data-lucide="timer" class="w-2.5 h-2.5"></i>
+                          <span class="ack-countdown-label">SLA …</span>
+                        </span>
+                      {% endif %}
+                      {# Escalation count — visible whenever the SLA sweeper has fired ≥1 time #}
+                      {% if p.escalation_count and p.escalation_count > 0 %}
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 text-[10px] font-bold uppercase tracking-wide"
+                              title="The SLA sweeper re-fired Slack/Email {{ p.escalation_count }} time(s) because no one acknowledged in time.">
+                          <i data-lucide="alert-octagon" class="w-2.5 h-2.5"></i>
+                          ESCALATED {{ p.escalation_count }}×
+                        </span>
+                      {% endif %}
+                      {# Bypass audit — visible whenever an operator force-replied on a locked playbook #}
+                      {% if p._bypass_by %}
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold uppercase tracking-wide"
+                              title="Playbook bypass approved by {{ p._bypass_by }} — reason: {{ p._bypass_reason }}">
+                          <i data-lucide="key-round" class="w-2.5 h-2.5"></i>
+                          BYPASS · {{ p._bypass_by }}
+                        </span>
+                      {% endif %}
+                      {# Review issue link — appears 24h after the action fires #}
+                      {% if p.review_issue_id and p.review_issue_url %}
+                        <a href="{{ p.review_issue_url }}" target="_blank" rel="noopener"
+                           onclick="event.stopPropagation();"
+                           class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold uppercase tracking-wide hover:bg-violet-100"
+                           title="Post-incident review opened {{ p.review_created_at[:19].replace('T',' ') }} — click to fill in the outcome / root cause.">
+                          <i data-lucide="clipboard-edit" class="w-2.5 h-2.5"></i>
+                          REVIEW · {{ p.review_issue_id }}
+                        </a>
+                      {% endif %}
+                      {# ── Acknowledge button — moved up here so it sits next
+                         to the playbook chip (conceptually grouped) and the
+                         action cell stays uncluttered. Only on tripwired
+                         posts that haven't been acked. ── #}
+                      {% if p._playbook and not p.ack_at %}
+                        <button type="button"
+                                data-ack-btn data-post-id="{{ p.id }}"
+                                onclick="event.stopPropagation(); acknowledgePost(this);"
+                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-600 text-white hover:bg-rose-700 border border-rose-700 text-[10px] font-bold uppercase tracking-wide transition-colors"
+                                title="Take ownership of this {{ p._playbook.name|lower }} incident. Stops the SLA countdown.">
+                          <i data-lucide="hand" class="w-2.5 h-2.5"></i>
+                          Acknowledge
+                        </button>
+                      {% endif %}
+                      {# ── Playbook chip — opens a popover with the
+                         required procedure for this incident class. ── #}
+                      {% if p._playbook %}
+                        {% set pb = p._playbook %}
+                        {% set pb_bg  = {'rose':'bg-rose-50','amber':'bg-amber-50','indigo':'bg-indigo-50'}.get(pb.color, 'bg-rose-50') %}
+                        {% set pb_fg  = {'rose':'text-rose-700','amber':'text-amber-700','indigo':'text-indigo-700'}.get(pb.color, 'text-rose-700') %}
+                        {% set pb_brd = {'rose':'border-rose-200','amber':'border-amber-200','indigo':'border-indigo-200'}.get(pb.color, 'border-rose-200') %}
+                        <details class="relative inline-block" data-pb-menu>
+                          <summary class="list-none cursor-pointer inline-flex items-center gap-1 px-1.5 py-0.5 rounded {{ pb_bg }} {{ pb_fg }} border {{ pb_brd }} text-[10px] font-bold uppercase tracking-wide hover:brightness-95"
+                                   onclick="event.stopPropagation();"
+                                   title="{{ pb.name }} playbook — click to see the procedure">
+                            <i data-lucide="{{ pb.icon }}" class="w-2.5 h-2.5"></i>
+                            {{ pb.name }}
+                          </summary>
+                          <div class="absolute left-0 top-full mt-1 z-40 bg-white border border-line rounded-lg shadow-[0_12px_32px_-8px_rgba(15,23,42,0.22)] w-[420px] max-w-[92vw] p-4 text-[12.5px]"
+                               onclick="event.stopPropagation();">
+                            <div class="flex items-start gap-2 pb-2 mb-3 border-b border-line/60">
+                              <div class="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 {{ pb_bg }} {{ pb_fg }} border {{ pb_brd }}">
+                                <i data-lucide="{{ pb.icon }}" class="w-3.5 h-3.5"></i>
+                              </div>
+                              <div class="flex-1 min-w-0">
+                                <div class="text-[14px] font-semibold text-ink leading-tight">{{ pb.name }} playbook</div>
+                                <div class="text-[11.5px] text-muted mt-0.5">
+                                  Owned by <span class="text-ink font-medium">{{ pb.owner_team }}</span> · acknowledge within <span class="text-ink font-medium">{{ pb.ack_deadline_min }} min</span>
+                                </div>
+                              </div>
+                            </div>
+                            <p class="text-ink/85 leading-relaxed mb-3">{{ pb.banner }}</p>
+                            <div class="text-[10.5px] uppercase font-semibold tracking-[0.12em] text-muted mb-1.5">Required steps</div>
+                            <ol class="space-y-1.5 text-ink/85 leading-snug mb-3">
+                              {% for step in pb.required_steps %}
+                              <li class="flex gap-2">
+                                <span class="text-muted/50 tabular-nums w-5 flex-shrink-0 mt-0.5">{{ loop.index }}.</span>
+                                <span class="flex-1">{{ step }}</span>
+                              </li>
+                              {% endfor %}
+                            </ol>
+                            {% if pb.block_auto_reply %}
+                            <div class="mt-2 px-2.5 py-2 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-[11.5px] flex items-start gap-1.5 leading-snug">
+                              <i data-lucide="lock" class="w-3 h-3 mt-0.5 flex-shrink-0"></i>
+                              <span><b>Auto-reply blocked.</b> The Reply button on this post will require a manual confirmation. No bot replies on social until {{ pb.owner_team }} approves.</span>
+                            </div>
+                            {% endif %}
+                          </div>
+                        </details>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                  <div class="text-[14px] leading-snug text-ink">
+                    {{ p.preview }}
+                    {% if p.content|length > 280 %}<span class="text-muted">…</span>{% endif %}
+                  </div>
+                  <div class="mt-1.5 flex items-center gap-1.5 flex-wrap text-[11.5px]">
+                    {# Side chip — only when it's NOT the default 'consumer'.
+                       97% of rows are consumer; showing it on every row is noise. #}
+                    {% if p.category and p.category != 'consumer' %}
+                      {% set tag_color = {
+                          'merchant':'bg-amber-50 text-amber-800 border-amber-100',
+                          'both':'bg-purple-50 text-purple-700 border-purple-100',
+                          'neither':'bg-slate-50 text-slate-600 border-slate-200'
+                        } %}
+                      <span class="px-1.5 py-0.5 rounded border {{ tag_color.get(p.category, tag_color['neither']) }}">{{ p.category }}</span>
+                    {% endif %}
+                    {# Sentiment chip — only when it's actionable. 'neutral' on
+                       every routine post is noise; we show only the signals
+                       that change how an operator should treat the post. #}
+                    {% if cls.get('sentiment') and cls.sentiment != 'neutral' %}
+                      {% set sc = {
+                          'positive':'bg-emerald-50 text-emerald-700 border-emerald-100',
+                          'negative':'bg-rose-50 text-rose-700 border-rose-100',
+                          'abusive':'bg-red-50 text-red-700 border-red-100',
+                          'mixed':'bg-amber-50 text-amber-700 border-amber-100'
+                        } %}
+                      <span class="px-1.5 py-0.5 rounded border {{ sc.get(cls.sentiment, sc['negative']) }}">{{ cls.sentiment }}</span>
+                    {% endif %}
+                    {# Tripwire — kept inline; this is the WHY the post got priority. #}
+                    {% for tw in cls.get('tripwires_fired', []) %}
+                      <span class="badge-tw px-1.5 py-0.5 rounded font-medium uppercase tracking-wide" title="Auto-escalated by rules. This category bypasses standard routing and goes straight to the listed teams.">⚡ {{ tw|replace('_', ' ') }}</span>
+                    {% endfor %}
+                    {# Audience routing — kept inline; this is the WHERE the post should go. #}
+                    {% if cls.get('audience') %}
+                      <span class="px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-600">→ {{ cls.audience|join(', ') }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="text-[12.5px] min-w-0">
+                  {% if p.author_url %}
+                    <a href="{{ p.author_url }}" target="_blank" rel="noopener noreferrer"
+                       class="font-medium truncate hover:text-primary block">@{{ p.author }}</a>
+                  {% else %}
+                    <div class="font-medium truncate text-muted">@{{ p.author or 'anonymous' }}</div>
+                  {% endif %}
+                  {# Phase γ — Author tier badge. Only rendered for noteworthy
+                     tiers (T0-T4 + bot); regulars and anonymous get no badge. #}
+                  {% if p.show_tier_badge %}
+                    <a href="/inbox?author_tier={{ p.tier_class }}&window={{ filters.window }}"
+                       class="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded tier-{{ p.tier_class }} text-[10.5px] uppercase tracking-wide hover:opacity-80"
+                       title="Tier {{ p.tier }}: {{ p.tier_label }}. Reach multiplier {{ '%.1f'|format(p.tier_multiplier or 1.0) }}x.{% if p.tier_watchlists %}&#10;On watchlists: {{ p.tier_watchlists|join(', ') }}{% endif %}">
+                      <span>{{ p.tier }}</span>
+                      <span class="font-semibold">{{ p.tier_label }}</span>
+                    </a>
+                  {% endif %}
+                  <div class="text-muted text-[11.5px] flex items-center gap-1.5 mt-0.5">
+                    {% if p.source == 'reddit' %}
+                      <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-[#FF4500]/10 text-[#DD4500] border border-[#FED4C0]">
+                        {{ icons.source_logo('reddit', size='11') }}
+                        Reddit
+                      </span>
+                      {% if p.metadata.subreddit %}<a href="https://reddit.com/r/{{ p.metadata.subreddit }}" target="_blank" rel="noopener noreferrer" class="truncate hover:text-primary">r/{{ p.metadata.subreddit }}</a>{% endif %}
+                    {% else %}
+                      <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-slate-100 text-ink border border-slate-300">
+                        {{ icons.source_logo('twitter', size='10') }}
+                        Twitter
+                      </span>
+                      {% if p.metadata.matched_query %}<span class="truncate">{{ p.metadata.matched_query }}</span>{% endif %}
+                    {% endif %}
+                  </div>
+                  {# Zomato-replied chip stays here (it's an inbound link to the
+                     existing reply tweet). All other status states moved to the
+                     new status chip in the action cell — single source of truth. #}
+                  {% set rs = p.zomato_response_status or 'unchecked' %}
+                  {% if rs == 'replied' %}
+                    <a href="{{ p.zomato_response_url or '#' }}" target="_blank" rel="noopener noreferrer"
+                       class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10.5px] font-medium hover:bg-emerald-100"
+                       title="Zomato replied to this post. Click to open the reply.">
+                      <i data-lucide="check-circle-2" class="w-3 h-3"></i>
+                      <span>Zomato replied</span>
+                    </a>
+                  {% endif %}
+                </div>
+                <div>
+                  {% set pb = p.priority_band or 'P3' %}
+                  <div class="flex items-center gap-1.5">
+                    {{ icons.urgency_chip(pb, size='sm') }}
+                    {# Risk dot — auto-reply eligibility at a glance.
+                       Green: will auto-fire / drain-eligible.
+                       Yellow: drain-eligible if you bulk-fire (some other gate failed).
+                       Red: human required (tripwire / abuse / sensitive audience).
+                       Grey: not classified / Reddit / already-replied. #}
+                    {% set _rd = p._risk_color or 'grey' %}
+                    {% set _dot_cls = {'green':'bg-emerald-500','yellow':'bg-amber-500','red':'bg-rose-500','grey':'bg-slate-300'}.get(_rd, 'bg-slate-300') %}
+                    <span class="w-2 h-2 rounded-full {{ _dot_cls }}"
+                          title="{{ p._risk_label or '' }}"></span>
+                  </div>
+                </div>
+                <div class="text-[12.5px] text-muted whitespace-nowrap">{{ p.ago }}</div>
+                {# ===========================================================
+                   ACTION CELL — Salesforce pattern.
+                   • One labeled primary action ("Reply") that opens the right
+                     composer based on source.
+                   • One ⋯ overflow menu with the rest, all labeled.
+                   • A clear status chip showing what already happened.
+                   =========================================================== #}
+                {% set action_taken_str = p.action_taken or '' %}
+                {% set taken = action_taken_str.split('+') if action_taken_str else [] %}
+                {% set already_slacked      = 'slack' in taken %}
+                {% set already_discorded    = 'discord' in taken %}
+                {% set already_emailed      = 'email' in taken %}
+                {% set already_sheeted      = 'sheets' in taken %}
+                {% set already_ticketed     = 'ticket' in taken %}
+                {% set already_replied_x    = 'twitter_reply' in taken %}
+                {% set already_commented_rd = 'reddit_comment' in taken %}
+                {% set src = (p.source or '')|lower %}
+                <div class="flex justify-end items-center gap-2">
+                  {# ── Status chip — what HAPPENED, not what's "verified". ── #}
+                  {% if already_replied_x or already_commented_rd %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-medium whitespace-nowrap"
+                          title="A public reply was sent{% if p.actioned_at %} at {{ p.actioned_at[:19].replace('T',' ') }} UTC{% endif %}">
+                      <i data-lucide="check" class="w-3 h-3"></i>
+                      Replied
+                    </span>
+                  {% elif already_ticketed %}
+                    {% if p._ticket_id and p._ticket_url %}
+                      <a href="{{ p._ticket_url }}" target="_blank" rel="noopener noreferrer"
+                         onclick="event.stopPropagation();"
+                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-medium whitespace-nowrap hover:bg-violet-100"
+                         title="Linear ticket {{ p._ticket_id }} — click to open in Linear">
+                        <i data-lucide="ticket" class="w-3 h-3"></i>
+                        {{ p._ticket_id }}
+                      </a>
+                    {% else %}
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-medium whitespace-nowrap"
+                            title="Linear ticket created{% if p.actioned_at %} at {{ p.actioned_at[:19].replace('T',' ') }} UTC{% endif %}">
+                        <i data-lucide="ticket" class="w-3 h-3"></i>
+                        Ticketed
+                      </span>
+                    {% endif %}
+                  {% elif already_slacked or already_discorded or already_emailed %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium whitespace-nowrap"
+                          title="Team alerted (Slack/Discord/Email){% if p.actioned_at %} at {{ p.actioned_at[:19].replace('T',' ') }} UTC{% endif %}">
+                      <i data-lucide="check" class="w-3 h-3"></i>
+                      Alerted
+                    </span>
+                  {% elif already_sheeted %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium whitespace-nowrap"
+                          title="Added a row to the Google Sheet">
+                      <i data-lucide="clipboard-check" class="w-3 h-3"></i>
+                      Logged
+                    </span>
+                  {% elif rs == 'no_reply' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-medium whitespace-nowrap"
+                          title="@zomato/@zomatocare tagged · 24h elapsed with no reply.">
+                      <i data-lucide="alert-circle" class="w-3 h-3"></i>
+                      Overdue
+                    </span>
+                  {% elif rs == 'unchecked' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium whitespace-nowrap"
+                          title="Awaiting reply from Zomato. We re-check progressively each cycle.">
+                      <i data-lucide="clock" class="w-3 h-3"></i>
+                      Awaiting
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200 text-[11px] font-medium whitespace-nowrap"
+                          title="No action needed yet.">
+                      <i data-lucide="circle" class="w-3 h-3"></i>
+                      Open
+                    </span>
+                  {% endif %}
+
+                  {# ── Primary action: contextual Reply button. ── #}
+                  {% if src == 'twitter' %}
+                    <button type="button"
+                            data-post-id="{{ p.id }}"
+                            {% if already_replied_x %}data-replied="1"{% endif %}
+                            onclick="event.stopPropagation(); openReplyComposer(this, 'twitter_reply');"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors
+                                   {% if already_replied_x %}bg-sky-50 text-sky-700 border border-sky-200 cursor-default
+                                   {% else %}bg-white border border-line text-ink hover:bg-sky-50 hover:text-sky-700 hover:border-sky-200{% endif %}"
+                            title="{% if already_replied_x %}Reply on X already sent{% else %}Compose a reply on X{% endif %}">
+                      <i data-lucide="{% if already_replied_x %}check{% else %}message-circle-reply{% endif %}" class="w-3.5 h-3.5"></i>
+                      {% if already_replied_x %}Replied{% else %}Reply{% endif %}
+                    </button>
+                  {% elif src == 'reddit' %}
+                    <button type="button"
+                            data-post-id="{{ p.id }}"
+                            {% if already_commented_rd %}data-replied="1"{% endif %}
+                            onclick="event.stopPropagation(); openReplyComposer(this, 'reddit_comment');"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors
+                                   {% if already_commented_rd %}bg-orange-50 text-orange-700 border border-orange-200 cursor-default
+                                   {% else %}bg-white border border-line text-ink hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200{% endif %}"
+                            title="{% if already_commented_rd %}Comment on Reddit already sent{% else %}Compose a comment on Reddit{% endif %}">
+                      <i data-lucide="{% if already_commented_rd %}check{% else %}message-square{% endif %}" class="w-3.5 h-3.5"></i>
+                      {% if already_commented_rd %}Replied{% else %}Reply{% endif %}
+                    </button>
+                  {% else %}
+                    <button type="button"
+                            data-draft-btn
+                            data-post-id="{{ p.id }}"
+                            onclick="event.stopPropagation(); openDraftReply(this);"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium bg-white border border-line text-ink hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200 transition-colors"
+                            title="Draft a reply suggestion (LLM)">
+                      <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                      Draft
+                    </button>
+                  {% endif %}
+
+                  {# ── ⋯ Overflow menu with everything else, all labeled. ── #}
+                  <details class="relative" data-row-menu>
+                    <summary class="list-none cursor-pointer w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-subtle hover:text-ink border border-transparent hover:border-line"
+                             onclick="event.stopPropagation();"
+                             title="More actions">
+                      <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+                    </summary>
+                    <div class="absolute right-0 top-full mt-1 z-30 bg-white border border-line rounded-md shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18)] w-[280px] py-1 text-[12.5px]"
+                         onclick="event.stopPropagation();">
+                      {% macro action_item(channel, icon, sent_label, send_label, already) %}
+                        {% set is_configured = channel in configured_channels %}
+                        {% set disabled = already or not is_configured %}
+                        <button type="button" data-post-id="{{ p.id }}"
+                                onclick="fireGenericAction(this, '{{ channel }}');"
+                                {% if disabled %}disabled{% endif %}
+                                class="w-full text-left px-3 py-1.5 hover:bg-subtle flex items-start gap-2 disabled:cursor-default disabled:hover:bg-transparent {% if not is_configured and not already %}opacity-70{% elif disabled %}opacity-50{% endif %}">
+                          <i data-lucide="{{ icon }}" class="w-3.5 h-3.5 text-muted mt-0.5 flex-shrink-0"></i>
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                              <span class="truncate">{% if already %}{{ sent_label }}{% else %}{{ send_label }}{% endif %}</span>
+                              {% if not is_configured and not already %}
+                                <span class="text-[9.5px] uppercase tracking-wider font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex-shrink-0">Setup</span>
+                              {% endif %}
+                            </div>
+                            {# Inline hint below the label — replaces the
+                               browser-native title tooltip (which positions
+                               itself off the cursor and overlaps the menu).
+                               Always visible so the operator knows exactly
+                               which env var is missing. #}
+                            {% if not is_configured and not already %}
+                              <div class="text-[10.5px] text-muted/80 mt-0.5 leading-tight font-mono">{{ channel_env_hint.get(channel, channel) }}</div>
+                            {% endif %}
+                          </div>
+                        </button>
+                      {% endmacro %}
+                      {{ action_item('slack',   'slack',          'Slack alert sent',  'Send Slack alert',     already_slacked) }}
+                      {{ action_item('discord', 'message-circle', 'Discord alert sent','Send Discord alert',   already_discorded) }}
+                      {{ action_item('email',   'mail',           'Email sent',        'Send email to team',   already_emailed) }}
+                      {{ action_item('ticket',  'ticket',         'Ticket created',    'Create Linear ticket', already_ticketed) }}
+                      {{ action_item('sheets',  'clipboard-list', 'Logged in Google Sheet', 'Log to Google Sheet', already_sheeted) }}
+                      <div class="border-t border-line/60 my-1"></div>
+                      <button type="button" data-flag-btn data-post-id="{{ p.id }}"
+                              data-flagged="{{ '1' if p.flagged_at else '0' }}"
+                              onclick="toggleFlag(this);"
+                              class="w-full text-left px-3 py-1.5 hover:bg-subtle flex items-center gap-2">
+                        <i data-lucide="star" class="w-3.5 h-3.5 {% if p.flagged_at %}text-amber-500 fill-current{% else %}text-muted{% endif %}"></i>
+                        {% if p.flagged_at %}Unflag{% else %}Flag for later{% endif %}
+                      </button>
+                      <a href="{{ p.url }}" target="_blank" rel="noopener noreferrer"
+                         class="w-full text-left px-3 py-1.5 hover:bg-subtle flex items-center gap-2">
+                        <i data-lucide="external-link" class="w-3.5 h-3.5 text-muted"></i>
+                        Open original
+                      </a>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <!-- Gmail-style pagination -->
+        {% if pagination.total_pages > 1 %}
+          <nav class="mt-4 bg-white border border-line rounded-lg shadow-card px-4 py-3 flex items-center justify-between flex-wrap gap-3" aria-label="Pagination">
+            <div class="text-[12.5px] text-muted">
+              Showing <span class="font-semibold text-ink">{{ pagination.from_idx }}–{{ pagination.to_idx }}</span> of <span class="font-semibold text-ink">{{ pagination.total_filtered }}</span> posts
+            </div>
+
+            <div class="flex items-center gap-1">
+              <!-- Prev -->
+              {% if pagination.has_prev %}
+                <a href="{{ link(page=pagination.page - 1) }}"
+                   class="w-8 h-8 rounded-md border border-line hover:bg-subtle flex items-center justify-center text-muted hover:text-ink"
+                   title="Previous page" aria-label="Previous page">
+                  <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                </a>
+              {% else %}
+                <span class="w-8 h-8 rounded-md border border-line/60 flex items-center justify-center text-muted/40 cursor-not-allowed" aria-disabled="true">
+                  <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                </span>
+              {% endif %}
+
+              <!-- Page numbers with smart elision -->
+              {% for p in pagination.pages %}
+                {% if p is none %}
+                  <span class="px-2 text-muted text-[13px] select-none">…</span>
+                {% elif p == pagination.page %}
+                  <span class="min-w-8 h-8 px-2 rounded-md bg-primary text-white text-[13px] font-semibold flex items-center justify-center" aria-current="page">{{ p }}</span>
+                {% else %}
+                  <a href="{{ link(page=p) }}"
+                     class="min-w-8 h-8 px-2 rounded-md border border-line hover:bg-subtle text-[13px] font-medium text-ink flex items-center justify-center">
+                    {{ p }}
+                  </a>
+                {% endif %}
+              {% endfor %}
+
+              <!-- Next -->
+              {% if pagination.has_next %}
+                <a href="{{ link(page=pagination.page + 1) }}"
+                   class="w-8 h-8 rounded-md border border-line hover:bg-subtle flex items-center justify-center text-muted hover:text-ink"
+                   title="Next page" aria-label="Next page">
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </a>
+              {% else %}
+                <span class="w-8 h-8 rounded-md border border-line/60 flex items-center justify-center text-muted/40 cursor-not-allowed" aria-disabled="true">
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </span>
+              {% endif %}
+            </div>
+
+            <!-- Per-page selector -->
+            <details class="relative">
+              <summary class="chip cursor-pointer flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-line text-[12.5px] font-medium">
+                <span class="text-muted">Per page</span>
+                <span>{{ pagination.per_page }}</span>
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-muted"></i>
+              </summary>
+              <div class="absolute right-0 bottom-full mb-1.5 bg-white border border-line rounded-md shadow-card text-[13px] z-10 w-32 py-1">
+                {% for n in [25, 50, 100, 200, 500] %}
+                  <a href="{{ link(per_page=n, page=1) }}"
+                     class="block px-3 py-1.5 hover:bg-subtle {% if pagination.per_page == n %}font-semibold text-primary{% endif %}">{{ n }} per page</a>
+                {% endfor %}
+              </div>
+            </details>
+          </nav>
+        {% endif %}
+
+        <div class="text-center text-[11.5px] text-muted mt-4">
+          Page {{ pagination.page }} of {{ pagination.total_pages }} · Auto-refresh every 5 min · Pre-classification: rules
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================================================
+     Claude Draft-Reply Modal — opens when ✨ button is clicked.
+     The reply is read-only on first render but the textarea is
+     editable; "Copy" puts the (possibly edited) text on the
+     clipboard, "Open in X" jumps to the source for pasting.
+     ============================================================ -->
+<!-- Reply Composer modal — generic for all reply-style channels (Twitter
+     reply + Reddit comment). Operator sees the templated text, can
+     edit it, clicks Send. POSTs to /api/actions/<channel>/<post_id>
+     with body {text}. -->
+<div id="replyComposerModal"
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/30 backdrop-blur-[2px]"
+     onclick="if (event.target === this) closeReplyComposer()">
+  <div class="bg-white rounded-xl shadow-[0_24px_48px_-12px_rgba(15,23,42,0.18)] w-[560px] max-w-[92vw] max-h-[88vh] overflow-hidden flex flex-col">
+    <div class="px-6 pt-5 pb-3 flex items-start gap-2">
+      <div class="flex-1 min-w-0">
+        <h2 id="rcmTitle" class="text-[16px] font-semibold tracking-tight">Reply</h2>
+        <p id="rcmSubtitle" class="text-[12px] text-muted mt-0.5 truncate">—</p>
+      </div>
+      <button onclick="closeReplyComposer()" class="w-8 h-8 -mt-1 -mr-1 rounded-md hover:bg-subtle flex items-center justify-center text-muted hover:text-ink" title="Close (esc)">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto px-6 pb-2 space-y-5">
+      <div>
+        <div id="rcmOriginalLabel" class="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Original</div>
+        <p id="rcmOriginal" class="text-[13.5px] text-ink/90 leading-relaxed whitespace-pre-wrap break-words">—</p>
+      </div>
+      <div id="rcmLoading" class="hidden py-6 text-center">
+        <div class="inline-flex items-center gap-2 text-[13px] text-muted">
+          <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9" stroke-opacity="0.25"/>
+            <path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/>
+          </svg>
+          <span id="rcmLoadingLabel">Loading…</span>
+        </div>
+      </div>
+      <div id="rcmError" class="hidden p-3 rounded-lg bg-rose-50/70 border border-rose-200/60 text-[12.5px] text-rose-800">—</div>
+
+      {# ── Unblock & reply panel — appears when the server returns 423.
+         Captures approver + reason for audit, then re-submits with force=true. #}
+      <div id="rcmPlaybookLock" class="hidden">
+        <div class="rounded-lg border border-rose-200 bg-rose-50/40 p-4 mb-4">
+          <div class="flex items-start gap-2 mb-2">
+            <div class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 bg-rose-100 text-rose-700 border border-rose-300">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[14px] font-semibold text-rose-900">
+                Playbook locked: <span id="rcmLockName">—</span>
+              </div>
+              <div class="text-[11.5px] text-rose-800/90 mt-0.5">
+                Owned by <span id="rcmLockOwner" class="font-semibold">—</span> · ack within <span id="rcmLockAck">—</span> min · public reply requires authorization.
+              </div>
+            </div>
+          </div>
+          <p id="rcmLockBanner" class="text-[12.5px] text-rose-900/85 leading-relaxed mt-2">—</p>
+          <div class="text-[10.5px] uppercase font-semibold tracking-[0.12em] text-rose-700/80 mt-3 mb-1">Procedure</div>
+          <ol id="rcmLockSteps" class="space-y-1 text-[12px] text-rose-900/85 leading-snug list-decimal list-inside"></ol>
+        </div>
+        <div class="space-y-3 px-1">
+          <div>
+            <label class="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted mb-1 block">Approver (who authorised this reply)</label>
+            <input id="rcmApprover" type="text"
+                   placeholder="e.g. @adv-ananya · Legal counsel"
+                   class="w-full px-3 py-2 text-[13px] border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300/60 focus:border-rose-400 placeholder:text-muted/60"
+                   oninput="updateRcmUnblockForm()">
+          </div>
+          <div>
+            <label class="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted mb-1 block">Reason / Authorization log</label>
+            <textarea id="rcmReason" rows="2"
+                      placeholder="e.g. Legal approved at 14:32 IST. Ticket ZOM-42. Public response cleared by founder office."
+                      class="w-full px-3 py-2 text-[13px] border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300/60 focus:border-rose-400 placeholder:text-muted/60"
+                      oninput="updateRcmUnblockForm()"></textarea>
+          </div>
+          <label class="flex items-start gap-2 text-[12.5px] text-ink/90 cursor-pointer select-none">
+            <input id="rcmConfirm" type="checkbox" class="mt-1 w-4 h-4 rounded border-line text-rose-600 focus:ring-rose-300"
+                   onchange="updateRcmUnblockForm()">
+            <span>I confirm I have explicit sign-off from the owner team. This reply will go out from <span id="rcmLockHandle" class="font-semibold">@…</span> and the audit trail will record my approver + reason.</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="rcmResult" class="hidden">
+        <div id="rcmReplyLabel" class="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Your reply</div>
+        <textarea id="rcmReplyText"
+                  class="w-full min-h-[110px] px-3.5 py-2.5 text-[14px] leading-relaxed border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300/60 focus:border-sky-400 placeholder:text-muted/60"
+                  oninput="updateRcmCharCount()"
+                  placeholder="Reply text…"></textarea>
+        <div class="mt-2 flex items-center gap-3 text-[11.5px] text-muted">
+          <span>Posts as <span id="rcmFromHandle" class="font-medium text-ink">—</span></span>
+          <span class="text-muted/50">·</span>
+          <span>Manual review required</span>
+          <span id="rcmCharCount" class="ml-auto tabular-nums">0 / —</span>
+        </div>
+      </div>
+    </div>
+    <div class="px-6 py-4 flex items-center gap-2 border-t border-line/70">
+      <button onclick="closeReplyComposer()" class="text-[12.5px] text-muted hover:text-ink px-2">Cancel</button>
+      <a id="rcmOpenLink" href="#" target="_blank" rel="noopener"
+         class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium text-ink border border-line rounded-md hover:bg-subtle">
+        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+        <span id="rcmOpenLabel">Open original</span>
+      </a>
+      <button id="rcmSendBtn" disabled onclick="sendReplyComposer()"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12.5px] font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-md disabled:opacity-40 disabled:cursor-not-allowed">
+        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        <span id="rcmSendLabel">Send</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="draftModal"
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/30 backdrop-blur-[2px]"
+     onclick="if (event.target === this) closeDraftReply()">
+  <div class="bg-white rounded-xl shadow-[0_24px_48px_-12px_rgba(15,23,42,0.18)] w-[600px] max-w-[92vw] max-h-[88vh] overflow-hidden flex flex-col">
+
+    <!-- Header — minimal: title + close. No model name, no provider chip,
+         no subtitle clutter (the original post itself tells us who/where). -->
+    <div class="px-6 pt-5 pb-3 flex items-start gap-2">
+      <div class="flex-1 min-w-0">
+        <h2 class="text-[16px] font-semibold tracking-tight">Draft reply</h2>
+        <p id="draftSubtitle" class="text-[12px] text-muted mt-0.5 truncate">—</p>
+      </div>
+      <button onclick="closeDraftReply()" class="w-8 h-8 -mt-1 -mr-1 rounded-md hover:bg-subtle flex items-center justify-center text-muted hover:text-ink" title="Close (esc)">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Body — generous padding, light dividers, no heavy borders -->
+    <div class="flex-1 overflow-y-auto px-6 pb-2 space-y-5">
+
+      <!-- Original post — clean text, no italic, no left rail.
+           URLs stripped client-side, HTML entities decoded. -->
+      <div>
+        <div class="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Original</div>
+        <p id="draftOriginal" class="text-[13.5px] text-ink/90 leading-relaxed whitespace-pre-wrap break-words">—</p>
+      </div>
+
+      <!-- Loading -->
+      <div id="draftLoading" class="hidden py-10 text-center">
+        <div class="inline-flex items-center gap-2 text-[13px] text-muted">
+          <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9" stroke-opacity="0.25"/>
+            <path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/>
+          </svg>
+          Drafting your reply…
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="draftError" class="hidden p-3 rounded-lg bg-rose-50/70 border border-rose-200/60 text-[12.5px] text-rose-800">—</div>
+
+      <!-- Result -->
+      <div id="draftResult" class="hidden">
+        <div class="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Reply</div>
+        <textarea id="draftReplyText"
+                  class="w-full min-h-[110px] px-3.5 py-2.5 text-[14px] leading-relaxed border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300/60 focus:border-violet-400 placeholder:text-muted/60"
+                  oninput="updateDraftCharCount()"
+                  placeholder="Reply text…"></textarea>
+
+        <!-- Inline meta row: tone · channel · char count.
+             Subdued; not colored pills shouting at the user. -->
+        <div class="mt-2 flex items-center gap-3 text-[11.5px] text-muted">
+          <span id="draftToneBadge" class="hidden capitalize">—</span>
+          <span id="draftToneSep" class="hidden text-muted/50">·</span>
+          <span id="draftChannelBadge" class="hidden">—</span>
+          <span id="draftCharCount" class="ml-auto tabular-nums">0 / 280</span>
+        </div>
+
+        <!-- Rationale: small, muted, no italic, no curly quotes. -->
+        <p id="draftRationale" class="hidden mt-3 text-[12px] text-muted leading-relaxed">—</p>
+
+        <!-- no_reply banner — surfaces only when the model judged a public
+             reply is inappropriate. Subtle amber tint. -->
+        <div id="draftNoReplyBanner" class="hidden mt-3 p-2.5 rounded-lg bg-amber-50/70 border border-amber-200/60 text-[12px] text-amber-900 flex items-start gap-2">
+          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 mt-0.5 flex-shrink-0"></i>
+          <span>A public reply isn't recommended for this post. DM or escalate to the founder office instead.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer — single primary action, light rest. No tagline. -->
+    <div class="px-6 py-4 flex items-center gap-2 border-t border-line/70">
+      <button onclick="closeDraftReply()" class="text-[12.5px] text-muted hover:text-ink px-2">Cancel</button>
+      <a id="draftOpenLink" href="#" target="_blank" rel="noopener"
+         class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium text-ink border border-line rounded-md hover:bg-subtle">
+        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+        Open source
+      </a>
+      <button id="draftCopyBtn" disabled onclick="copyDraftReply()"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12.5px] font-medium text-white bg-ink hover:bg-ink/90 rounded-md disabled:opacity-40 disabled:cursor-not-allowed">
+        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+        Copy reply
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  lucide.createIcons();
+
+  // ---- Slack action button ------------------------------------------------
+  // Each row's "Slack" button POSTs to /api/actions/slack/<post_id>. On
+  // success the button flips to a green check. The full-page reload below
+  // is paused while a request is in flight so we don't yank the result.
+  let _slackInFlight = 0;
+
+  async function fireSlackAction(btn) {
+    if (btn.dataset.slacked === '1') return; // already fired
+    if (btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    _slackInFlight++;
+    const postId = btn.dataset.postId;
+    const original = btn.innerHTML;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" stroke-opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/></svg>';
+    try {
+      const resp = await fetch('/api/actions/slack/' + encodeURIComponent(postId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && (data.status === 'fired' || data.status === 'already_actioned')) {
+        btn.dataset.slacked = '1';
+        btn.classList.remove('text-muted', 'hover:bg-indigo-50', 'hover:text-primary',
+                             'hover:border-indigo-200', 'text-muted/50', 'hover:bg-subtle',
+                             'border-transparent');
+        btn.classList.add('bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200',
+                          'hover:bg-emerald-100');
+        btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
+        btn.title = data.status === 'fired'
+          ? 'Slack alert sent ✓'
+          : 'Slack alert already sent';
+        lucide.createIcons();
+      } else {
+        btn.innerHTML = original;
+        const why = (data && (data.status || data.error)) || ('HTTP ' + resp.status);
+        btn.title = 'Slack send failed: ' + why;
+        // brief red flash
+        btn.classList.add('text-rose-600');
+        setTimeout(() => btn.classList.remove('text-rose-600'), 1800);
+        lucide.createIcons();
+      }
+    } catch (err) {
+      btn.innerHTML = original;
+      btn.title = 'Network error: ' + err.message;
+      lucide.createIcons();
+    } finally {
+      btn.dataset.busy = '';
+      _slackInFlight--;
+    }
+  }
+
+  // Auto-refresh every 60s — but back off if a Slack click or draft modal
+  // is still pending (don't yank the result mid-action).
+  function _maybeReload() {
+    if (_slackInFlight > 0 || _draftInFlight > 0 || _draftModalOpen) {
+      setTimeout(_maybeReload, 2000);
+    } else {
+      window.location.reload();
+    }
+  }
+  setTimeout(_maybeReload, 60000);
+
+  // ---- Operator flag (star) ---------------------------------------------
+  // Optimistic toggle: flip the visual state immediately, send the request,
+  // and only revert if the server says no. Feels instant; survives flaky
+  // networks because the server is the source of truth.
+  // Update the sidebar's Action queue → Flagged entry + the wrapper
+  // visibility based on the new count. Pure DOM manipulation; no page
+  // reload, so the entry surfaces the moment you flag your first post.
+  function _bumpSidebarFlagCount(delta) {
+    const navEl    = document.querySelector('[data-flagged-nav]');
+    const countEl  = document.querySelector('[data-flagged-count]');
+    const wrapper  = document.querySelector('[data-action-queue]');
+    if (!navEl || !countEl || !wrapper) return;
+    const current = parseInt(countEl.textContent.trim() || '0', 10) || 0;
+    const next    = Math.max(0, current + delta);
+    countEl.textContent = String(next);
+    navEl.classList.toggle('hidden', next === 0);
+    // Wrapper visibility: show if either action-queue item has count > 0.
+    const staleCountEl = document.querySelector('[data-stale-count]');
+    const staleN = staleCountEl ? (parseInt(staleCountEl.textContent.trim() || '0', 10) || 0) : 0;
+    wrapper.classList.toggle('hidden', staleN === 0 && next === 0);
+  }
+
+  async function toggleFlag(btn) {
+    if (btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+
+    const postId = btn.dataset.postId;
+    const wasFlagged = btn.dataset.flagged === '1';
+    const icon = btn.querySelector('i');
+    const apply = (flagged) => {
+      btn.dataset.flagged = flagged ? '1' : '0';
+      btn.classList.toggle('text-amber-500', flagged);
+      btn.classList.toggle('text-muted', !flagged);
+      if (icon) icon.classList.toggle('fill-current', flagged);
+      btn.title = flagged ? 'Unflag this post' : 'Flag for later';
+    };
+
+    apply(!wasFlagged); // optimistic flip
+    _bumpSidebarFlagCount(wasFlagged ? -1 : +1); // optimistic sidebar update
+
+    try {
+      const resp = await fetch(
+        '/api/posts/' + encodeURIComponent(postId) + '/flag',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+      );
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      // Sync to server truth — if the optimistic flip was wrong, fix both.
+      if (!!data.flagged !== !wasFlagged) {
+        apply(!!data.flagged);
+        _bumpSidebarFlagCount(!!data.flagged ? +1 : -1);
+      } else {
+        apply(!!data.flagged);
+      }
+    } catch (e) {
+      apply(wasFlagged); // revert row
+      _bumpSidebarFlagCount(wasFlagged ? +1 : -1); // revert sidebar
+      btn.title = 'Flag failed: ' + (e.message || 'network error');
+    } finally {
+      btn.dataset.busy = '';
+    }
+  }
+
+  // ---- Claude Draft-Reply modal -----------------------------------------
+  let _draftInFlight = 0;
+  let _draftModalOpen = false;
+  let _draftCurrentPostId = null;
+  let _draftCurrentPostUrl = null;
+
+  async function openDraftReply(btn) {
+    const postId = btn.dataset.postId;
+    _draftCurrentPostId = postId;
+    _draftModalOpen = true;
+    _draftInFlight++;
+
+    // Reset modal state
+    const modal = document.getElementById('draftModal');
+    document.getElementById('draftLoading').classList.remove('hidden');
+    document.getElementById('draftError').classList.add('hidden');
+    document.getElementById('draftResult').classList.add('hidden');
+    document.getElementById('draftCopyBtn').disabled = true;
+    document.getElementById('draftOriginal').textContent = '…';
+    document.getElementById('draftSubtitle').textContent = 'Loading…';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // Fetch the post first so we have content + url to populate the modal,
+    // then call Claude for the draft.
+    let post;
+    try {
+      const postResp = await fetch('/api/post/' + encodeURIComponent(postId));
+      post = await postResp.json();
+      if (!post || post.error) throw new Error(post && post.error || 'post not found');
+    } catch (e) {
+      _showDraftError('Could not load post: ' + e.message);
+      _draftInFlight--;
+      return;
+    }
+    _draftCurrentPostUrl = post.url || '#';
+    document.getElementById('draftOpenLink').href = _draftCurrentPostUrl;
+
+    // Clean the original-post excerpt for display:
+    //   1. Decode HTML entities (&amp; → &, &lt; → <, etc.) — server stores raw text
+    //      but the post_detail API roundtrip can re-encode them.
+    //   2. Strip URLs entirely. Reddit `https://preview.redd.it/.../?width=1080&format=...`
+    //      adds zero signal for an operator drafting a reply, and wraps ugly.
+    //   3. Collapse 3+ newlines to 2 so multi-line posts don't sprawl.
+    const cleanOriginal = (post.content || '(empty)')
+      .replace(/<[^>]+>/g, '')                          // strip stray HTML tags
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/https?:\/\/\S+/g, '')                   // strip bare URLs
+      .replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n')
+      .trim() || '(empty)';
+    document.getElementById('draftOriginal').textContent = cleanOriginal;
+
+    // Subtitle: @author · source · priority. Priority hidden if NULL.
+    const author = (post.author || 'anon').replace(/^@/, '');
+    const sourceLabel = (post.source === 'twitter') ? 'X (Twitter)'
+                       : (post.source === 'reddit') ? 'Reddit' : (post.source || '');
+    const parts = ['@' + author, sourceLabel];
+    if (post.priority_band) parts.push(post.priority_band);
+    document.getElementById('draftSubtitle').textContent = parts.join(' · ');
+
+    // Now ask Claude
+    try {
+      const resp = await fetch('/api/draft-reply/' + encodeURIComponent(postId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json().catch(() => ({}));
+      document.getElementById('draftLoading').classList.add('hidden');
+      if (!resp.ok || !data.ok) {
+        const err = (data && data.error) || ('HTTP ' + resp.status);
+        const hint = resp.status === 503
+          ? ' Add an API key in .env and restart the server (see .env.example).'
+          : '';
+        _showDraftError(err + hint);
+        return;
+      }
+      _showDraftResult(data);
+    } catch (err) {
+      _showDraftError('Network error: ' + err.message);
+    } finally {
+      _draftInFlight--;
+    }
+  }
+
+  function _showDraftError(msg) {
+    document.getElementById('draftLoading').classList.add('hidden');
+    const errEl = document.getElementById('draftError');
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+
+  function _showDraftResult(data) {
+    const result = document.getElementById('draftResult');
+    const ta = document.getElementById('draftReplyText');
+    result.classList.remove('hidden');
+    ta.value = data.reply || '';
+    updateDraftCharCount();
+
+    // Inline meta row — tone · channel — kept subdued (no colored pills).
+    const toneBadge = document.getElementById('draftToneBadge');
+    const sep = document.getElementById('draftToneSep');
+    const chanBadge = document.getElementById('draftChannelBadge');
+    const hasT = !!data.tone, hasC = !!data.channel;
+    if (hasT) { toneBadge.textContent = data.tone; toneBadge.classList.remove('hidden'); }
+    else { toneBadge.classList.add('hidden'); }
+    if (hasC) {
+      // "public_reply" → "Public reply"; "dm_request" → "DM request" etc.
+      chanBadge.textContent = data.channel.replace(/_/g, ' ').replace(/\bdm\b/i, 'DM');
+      chanBadge.classList.remove('hidden');
+    } else {
+      chanBadge.classList.add('hidden');
+    }
+    if (hasT && hasC) sep.classList.remove('hidden'); else sep.classList.add('hidden');
+    // Rationale — plain prose, no quote marks, no italic. Anthropic-style:
+    // it's just a small explanatory line below the reply, not a feature.
+    const rat = document.getElementById('draftRationale');
+    if (data.rationale) {
+      rat.textContent = data.rationale;
+      rat.classList.remove('hidden');
+    } else {
+      rat.classList.add('hidden');
+    }
+    // No-reply banner
+    const banner = document.getElementById('draftNoReplyBanner');
+    if (data.channel === 'no_reply' || !data.reply) {
+      banner.classList.remove('hidden');
+      ta.value = ta.value || '(Claude judged that no public reply is appropriate. Edit here if you disagree.)';
+    } else {
+      banner.classList.add('hidden');
+    }
+
+    document.getElementById('draftCopyBtn').disabled = false;
+    lucide.createIcons();
+    ta.focus();
+  }
+
+  function updateDraftCharCount() {
+    const ta = document.getElementById('draftReplyText');
+    const len = ta.value.length;
+    const counter = document.getElementById('draftCharCount');
+    counter.textContent = len + '/280';
+    counter.classList.toggle('text-rose-600', len > 280);
+    counter.classList.toggle('font-semibold', len > 280);
+  }
+
+  function closeDraftReply() {
+    const modal = document.getElementById('draftModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    _draftModalOpen = false;
+    _draftCurrentPostId = null;
+  }
+
+  async function copyDraftReply() {
+    const ta = document.getElementById('draftReplyText');
+    const btn = document.getElementById('draftCopyBtn');
+    const text = ta.value;
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = btn.innerHTML;
+      btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Copied';
+      lucide.createIcons();
+      setTimeout(() => { btn.innerHTML = original; lucide.createIcons(); }, 1600);
+    } catch (e) {
+      // Fallback: select the textarea so user can ⌘C
+      ta.select();
+      btn.title = 'Copy failed. Text is selected, press ⌘C.';
+    }
+  }
+
+  // ESC closes the modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && _draftModalOpen) {
+      closeDraftReply();
+    }
+  });
+
+  // ---- Reply Composer modal --------------------------------------------
+  // Generic for all reply-style channels (Twitter reply, Reddit comment).
+  // Click "Reply on X" / "Comment on Reddit" → fetches templated text from
+  // /api/actions/<channel>/<post_id>/preview → operator edits → click Send →
+  // POSTs to /api/actions/<channel>/<post_id> with body {text}.
+  // Idempotent: inbox button greys after success.
+  let _rcmModalOpen = false;
+  let _rcmInFlight = false;
+  let _rcmCurrentBtn = null;
+  let _rcmPostId = null;
+  let _rcmChannel = null;       // 'twitter_reply' | 'reddit_comment'
+  let _rcmCharLimit = 280;
+
+  // Per-channel display config. Keep in lockstep with the channel modules.
+  const RCM_CONFIG = {
+    twitter_reply: {
+      title:           'Reply on X',
+      sendLabel:       'Send reply',
+      replyLabel:      'Your reply',
+      originalLabel:   'Original tweet',
+      openLabel:       'Open tweet',
+      handlePrefix:    '@',
+      defaultHandle:   'forzomato',
+      handleEnv:       'TWITTER_HANDLE',
+      charLimit:       280,
+      previewKeyExcerpt:  'tweet_excerpt',
+      previewKeyAuthor:   'tweet_author',
+      previewKeyText:     'reply_text',
+      previewKeyUrl:      'tweet_url',
+      previewKeyAlready:  'already_replied',
+      configErrorHint: 'TWITTER_COOKIE_AUTH_TOKEN and TWITTER_COOKIE_CT0',
+      btnReplyClass: ['text-muted','hover:bg-sky-50','hover:text-sky-700','border-transparent','hover:border-sky-200'],
+      btnDoneClass:  ['bg-sky-50','text-sky-700','border','border-sky-200'],
+      doneTitle:     'Reply already sent on X',
+    },
+    reddit_comment: {
+      title:           'Comment on Reddit',
+      sendLabel:       'Send comment',
+      replyLabel:      'Your comment',
+      originalLabel:   'Original post',
+      openLabel:       'Open Reddit post',
+      handlePrefix:    'u/',
+      defaultHandle:   'krazybionic',
+      handleEnv:       'REDDIT_HANDLE',
+      charLimit:       1500,
+      previewKeyExcerpt:  'post_excerpt',
+      previewKeyAuthor:   'post_author',
+      previewKeyText:     'comment_text',
+      previewKeyUrl:      'reddit_url',
+      previewKeyAlready:  'already_commented',
+      configErrorHint: 'REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USERNAME, REDDIT_PASSWORD',
+      btnReplyClass: ['text-muted','hover:bg-orange-50','hover:text-orange-700','border-transparent','hover:border-orange-200'],
+      btnDoneClass:  ['bg-orange-50','text-orange-700','border','border-orange-200'],
+      doneTitle:     'Comment already sent on Reddit',
+    },
+  };
+
+  async function openReplyComposer(btn, channel) {
+    if (btn.dataset.replied === '1') return;
+    if (_rcmModalOpen) return;
+    const cfg = RCM_CONFIG[channel];
+    if (!cfg) {
+      console.warn('Unknown reply channel:', channel);
+      return;
+    }
+    _rcmModalOpen = true;
+    _rcmCurrentBtn = btn;
+    _rcmPostId = btn.dataset.postId;
+    _rcmChannel = channel;
+    _rcmCharLimit = cfg.charLimit;
+
+    // Set channel-specific labels
+    document.getElementById('rcmTitle').textContent = cfg.title;
+    document.getElementById('rcmSendLabel').textContent = cfg.sendLabel;
+    document.getElementById('rcmReplyLabel').textContent = cfg.replyLabel;
+    document.getElementById('rcmOriginalLabel').textContent = cfg.originalLabel;
+    document.getElementById('rcmOpenLabel').textContent = cfg.openLabel;
+    const ta = document.getElementById('rcmReplyText');
+    ta.setAttribute('maxlength', String(cfg.charLimit));
+    ta.placeholder = cfg.replyLabel + '…';
+
+    const modal = document.getElementById('replyComposerModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // Reset state
+    document.getElementById('rcmError').classList.add('hidden');
+    document.getElementById('rcmResult').classList.add('hidden');
+    document.getElementById('rcmLoading').classList.remove('hidden');
+    document.getElementById('rcmLoadingLabel').textContent = 'Loading…';
+    document.getElementById('rcmSendBtn').disabled = true;
+    document.getElementById('rcmSubtitle').textContent = '—';
+    document.getElementById('rcmOriginal').textContent = '—';
+    document.getElementById('rcmOpenLink').setAttribute('href', '#');
+
+    try {
+      const url = '/api/actions/' + channel + '/' + encodeURIComponent(_rcmPostId) + '/preview';
+      const resp = await fetch(url, { method: 'GET' });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        showRcmError(data.error || 'Failed to load preview (HTTP ' + resp.status + ')');
+        return;
+      }
+      const author = data[cfg.previewKeyAuthor] || 'unknown';
+      const excerpt = data[cfg.previewKeyExcerpt] || '(no content)';
+      const replyText = data[cfg.previewKeyText] || '';
+      const targetUrl = data[cfg.previewKeyUrl] || '#';
+      const already = !!data[cfg.previewKeyAlready];
+
+      document.getElementById('rcmSubtitle').textContent =
+        cfg.handlePrefix + author + (data.configured ? '' : ' — ⚠ not configured');
+      document.getElementById('rcmOriginal').textContent = excerpt;
+      ta.value = replyText;
+      updateRcmCharCount();
+      document.getElementById('rcmOpenLink').setAttribute('href', targetUrl);
+      const fromHandle = (window[cfg.handleEnv] || '').replace(/^[@/u]+/, '') || cfg.defaultHandle;
+      document.getElementById('rcmFromHandle').textContent = cfg.handlePrefix + fromHandle;
+
+      document.getElementById('rcmLoading').classList.add('hidden');
+      document.getElementById('rcmResult').classList.remove('hidden');
+      const sendBtn = document.getElementById('rcmSendBtn');
+      if (already) {
+        showRcmError('Already sent for this post.');
+      } else if (!data.configured) {
+        showRcmError('Connector not configured. Set ' + cfg.configErrorHint + ' in .env.');
+      } else {
+        sendBtn.disabled = false;
+        ta.focus();
+      }
+    } catch (e) {
+      showRcmError('Network error: ' + e.message);
+    }
+  }
+
+  function showRcmError(msg) {
+    document.getElementById('rcmLoading').classList.add('hidden');
+    const err = document.getElementById('rcmError');
+    err.textContent = msg;
+    err.classList.remove('hidden');
+  }
+
+  function updateRcmCharCount() {
+    const ta = document.getElementById('rcmReplyText');
+    const counter = document.getElementById('rcmCharCount');
+    const len = (ta.value || '').length;
+    counter.textContent = len + ' / ' + _rcmCharLimit;
+    counter.classList.toggle('text-rose-600', len > _rcmCharLimit);
+    const sendBtn = document.getElementById('rcmSendBtn');
+    if (!_rcmInFlight) {
+      sendBtn.disabled = (len === 0 || len > _rcmCharLimit);
+    }
+  }
+
+  // Whether the modal is currently in "unblock" mode (showing the
+  // playbook-lock panel, sending with force=true). Toggled by the 423
+  // response handler.
+  let _rcmUnblock = false;
+
+  function showRcmPlaybookLock(data) {
+    // Render the lock panel from the 423 response data.
+    document.getElementById('rcmLockName').textContent   = data.playbook || '—';
+    document.getElementById('rcmLockOwner').textContent  = data.owner_team || '—';
+    document.getElementById('rcmLockAck').textContent    = (data.ack_deadline_min || '—') + '';
+    document.getElementById('rcmLockBanner').textContent = data.banner || data.reason || '';
+    const stepsEl = document.getElementById('rcmLockSteps');
+    stepsEl.innerHTML = '';
+    (data.required_steps || []).forEach((s) => {
+      const li = document.createElement('li');
+      li.textContent = s;
+      stepsEl.appendChild(li);
+    });
+    const handle = (RCM_CONFIG[_rcmChannel] || {}).handlePrefix === 'u/' ? 'u/krazybionic' : '@forzomato';
+    document.getElementById('rcmLockHandle').textContent = handle;
+
+    // Show the panel, switch the Send button to override mode.
+    document.getElementById('rcmPlaybookLock').classList.remove('hidden');
+    document.getElementById('rcmError').classList.add('hidden');
+    const sendBtn = document.getElementById('rcmSendBtn');
+    sendBtn.classList.remove('bg-sky-600', 'hover:bg-sky-700');
+    sendBtn.classList.add('bg-rose-600', 'hover:bg-rose-700');
+    document.getElementById('rcmSendLabel').textContent = 'Send with override';
+    _rcmUnblock = true;
+    updateRcmUnblockForm();
+    lucide.createIcons();
+    // Reset approver/reason/confirm so each open is a clean state.
+    document.getElementById('rcmApprover').value = '';
+    document.getElementById('rcmReason').value   = '';
+    document.getElementById('rcmConfirm').checked = false;
+  }
+
+  function hideRcmPlaybookLock() {
+    document.getElementById('rcmPlaybookLock').classList.add('hidden');
+    const sendBtn = document.getElementById('rcmSendBtn');
+    sendBtn.classList.add('bg-sky-600', 'hover:bg-sky-700');
+    sendBtn.classList.remove('bg-rose-600', 'hover:bg-rose-700');
+    document.getElementById('rcmSendLabel').textContent = 'Send';
+    _rcmUnblock = false;
+  }
+
+  // Send button enable rule changes when the lock panel is showing.
+  // Bound from the unblock-form inputs.
+  function updateRcmUnblockForm() {
+    if (!_rcmUnblock) return;
+    const sendBtn = document.getElementById('rcmSendBtn');
+    const approver = (document.getElementById('rcmApprover').value || '').trim();
+    const reason   = (document.getElementById('rcmReason').value   || '').trim();
+    const confirmed = document.getElementById('rcmConfirm').checked;
+    const ta = document.getElementById('rcmReplyText');
+    const len = (ta.value || '').trim().length;
+    sendBtn.disabled = !(approver && reason && confirmed && len > 0 && len <= _rcmCharLimit);
+  }
+
+  async function sendReplyComposer() {
+    if (_rcmInFlight) return;
+    const cfg = RCM_CONFIG[_rcmChannel];
+    if (!cfg) return;
+    const ta = document.getElementById('rcmReplyText');
+    const text = (ta.value || '').trim();
+    if (!text || text.length > _rcmCharLimit) return;
+
+    // If we're in unblock mode, validate audit fields before firing.
+    let body = { text };
+    if (_rcmUnblock) {
+      const approver = (document.getElementById('rcmApprover').value || '').trim();
+      const reason   = (document.getElementById('rcmReason').value   || '').trim();
+      const confirmed = document.getElementById('rcmConfirm').checked;
+      if (!approver || !reason || !confirmed) return;
+      body = { text, force: true, approver, reason };
+    }
+
+    _rcmInFlight = true;
+    const sendBtn = document.getElementById('rcmSendBtn');
+    const original = sendBtn.innerHTML;
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" stroke-opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/></svg> Posting…';
+
+    try {
+      const url = '/api/actions/' + _rcmChannel + '/' + encodeURIComponent(_rcmPostId);
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      // 423 → playbook-locked. Swap to the unblock panel and let the
+      // operator capture an approver + reason before retrying.
+      if (resp.status === 423 || data.status === 'blocked:playbook') {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = original;
+        lucide.createIcons();
+        _rcmInFlight = false;
+        showRcmPlaybookLock(data);
+        return;
+      }
+      if (!resp.ok || !data.ok) {
+        const msg = (data.result && data.result.error) || data.error ||
+                    'Failed (HTTP ' + resp.status + ')';
+        showRcmError(msg);
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = original;
+        lucide.createIcons();
+        _rcmInFlight = false;
+        return;
+      }
+      // Success — flip the inbox button and close after a beat
+      if (_rcmCurrentBtn) {
+        _rcmCurrentBtn.dataset.replied = '1';
+        _rcmCurrentBtn.classList.remove(...cfg.btnReplyClass);
+        _rcmCurrentBtn.classList.add(...cfg.btnDoneClass);
+        _rcmCurrentBtn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
+        _rcmCurrentBtn.title = cfg.doneTitle;
+      }
+      sendBtn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Sent';
+      lucide.createIcons();
+      setTimeout(() => closeReplyComposer(), 1200);
+    } catch (e) {
+      showRcmError('Network error: ' + e.message);
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = original;
+      lucide.createIcons();
+    } finally {
+      _rcmInFlight = false;
+    }
+  }
+
+  function closeReplyComposer() {
+    const modal = document.getElementById('replyComposerModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    _rcmModalOpen = false;
+    _rcmCurrentBtn = null;
+    _rcmPostId = null;
+    _rcmChannel = null;
+    hideRcmPlaybookLock();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && _rcmModalOpen) {
+      closeReplyComposer();
+    }
+  });
+
+  // ---- Generic per-channel action (overflow menu items) ------------------
+  // POSTs to /api/actions/<channel>/<post_id>. On success, disables the
+  // menu item and updates the row's status chip. Channel ∈
+  // {slack, discord, email, sheets, ticket}.
+  const _GENERIC_LABELS = {
+    slack:   { sent: 'Slack alert sent',  pending: 'Sending Slack alert…' },
+    discord: { sent: 'Discord alert sent',pending: 'Sending Discord alert…' },
+    email:   { sent: 'Email sent',        pending: 'Sending email…' },
+    sheets:  { sent: 'Logged to sheet',   pending: 'Logging to sheet…' },
+    ticket:  { sent: 'Ticket created',    pending: 'Creating ticket…' },
+  };
+
+  async function fireGenericAction(btn, channel) {
+    if (btn.disabled) return;
+    const labels = _GENERIC_LABELS[channel] || { sent: 'Sent', pending: 'Sending…' };
+    const postId = btn.dataset.postId;
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" stroke-opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/></svg>' + labels.pending;
+    try {
+      const url = '/api/actions/' + channel + '/' + encodeURIComponent(postId);
+      const resp = await fetch(url, { method: 'POST' });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        // Translate the dispatcher's status codes into a friendly toast.
+        // Avoids dumping JSON / "routing wanted [...] but none of those..."
+        // walls of text on the user.
+        const HINTS = {
+          slack:   'SLACK_WEBHOOK_URL',
+          discord: 'DISCORD_WEBHOOK_URL',
+          email:   'SMTP_HOST / SMTP_USER / SMTP_PASS',
+          sheets:  'SHEETS_WEBHOOK_URL',
+          ticket:  'LINEAR_API_KEY + LINEAR_TEAM_ID',
+        };
+        let msg;
+        const status = (data.status || '').toString();
+        if (status === 'skipped:no_webhook') {
+          msg = (HINTS[channel] ? channel + ' isn’t configured yet — add ' + HINTS[channel] + ' to .env and restart.'
+                                : channel + ' isn’t configured yet.');
+        } else if (status === 'already_actioned') {
+          msg = labels.sent + ' (already done).';
+        } else if (status === 'skipped:not_routable') {
+          msg = 'Routing rules don’t fire ' + channel + ' for this priority. Try a P0 / tripwired post.';
+        } else if (status === 'failed') {
+          // Surface the per-channel error string the dispatcher captured.
+          const innerErr = data.meta && data.meta.channels && data.meta.channels[channel] && data.meta.channels[channel].error;
+          msg = innerErr || 'Send failed — check the server log.';
+        } else {
+          msg = (data.meta && data.meta.error) || data.error || data.reason || ('Failed (HTTP ' + resp.status + ')');
+        }
+        btn.disabled = false;
+        btn.innerHTML = original;
+        lucide.createIcons();
+        showRowToast(btn, msg, 'error');
+        return;
+      }
+      // Success: keep disabled, swap label to "sent" form.
+      btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i>' + labels.sent;
+      lucide.createIcons();
+      showRowToast(btn, labels.sent, 'ok');
+      // Close the dropdown after a beat so the user sees the confirmation.
+      setTimeout(() => {
+        const details = btn.closest('details[data-row-menu]');
+        if (details) details.removeAttribute('open');
+      }, 900);
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = original;
+      lucide.createIcons();
+      showRowToast(btn, 'Network error: ' + e.message, 'error');
+    }
+  }
+
+  // In-row toast — floats a wrapping chip near the action cell. Errors stay
+  // up longer so you can actually read them; success toasts disappear fast.
+  function showRowToast(anchor, msg, kind) {
+    const toast = document.createElement('div');
+    const klass = kind === 'error'
+      ? 'bg-rose-600 text-white'
+      : 'bg-emerald-600 text-white';
+    toast.className = 'fixed z-[60] px-3 py-2 rounded-md shadow-[0_12px_32px_-8px_rgba(15,23,42,0.25)] text-[12px] leading-snug max-w-[320px] ' + klass;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    const r = anchor.getBoundingClientRect();
+    // Anchor to the right edge of the action cell so the toast hangs off it
+    // visually instead of overlapping the row content.
+    const tw = toast.getBoundingClientRect().width || 280;
+    let top  = r.top  + window.scrollY - toast.getBoundingClientRect().height - 8;
+    let left = r.right + window.scrollX - tw;
+    if (top < window.scrollY + 8) top = r.bottom + window.scrollY + 8;
+    if (left < 8) left = 8;
+    toast.style.top  = top  + 'px';
+    toast.style.left = left + 'px';
+    const ttl = (kind === 'error') ? 4500 : 2000;
+    setTimeout(() => toast.remove(), ttl);
+  }
+
+  // ---- Acknowledgment ---------------------------------------------------
+  // POSTs to /api/posts/<id>/acknowledge with the operator name pulled
+  // from a localStorage prompt (one-time per browser). On success, the
+  // SLA countdown chip is removed and the button flips to a green
+  // "Acked by …" pill.
+  function getOperatorHandle() {
+    let op = localStorage.getItem('zsw_operator');
+    if (!op) {
+      op = (prompt(
+        'Your handle (used to record acknowledgments). Stored locally only.',
+        '@you'
+      ) || '').trim();
+      if (op) localStorage.setItem('zsw_operator', op);
+    }
+    return op || 'anonymous';
+  }
+
+  async function acknowledgePost(btn) {
+    if (btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    const operator = getOperatorHandle();
+    const original = btn.innerHTML;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" stroke-opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/></svg> Acknowledging…';
+    try {
+      const url = '/api/posts/' + encodeURIComponent(btn.dataset.postId) + '/acknowledge';
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operator }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        btn.innerHTML = original;
+        btn.dataset.busy = '';
+        lucide.createIcons();
+        return;
+      }
+      // Replace button with ack pill, remove the countdown chip in this row.
+      const row = btn.closest('.row');
+      if (row) {
+        const cd = row.querySelector('.ack-countdown');
+        if (cd) cd.remove();
+      }
+      btn.outerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200" title="Acknowledged by ' + operator + ' at ' + data.ack_at + '"><i data-lucide="check" class="w-3.5 h-3.5"></i>Acked · ' + operator + '</span>';
+      lucide.createIcons();
+    } catch (e) {
+      btn.innerHTML = original;
+      btn.dataset.busy = '';
+      lucide.createIcons();
+    }
+  }
+
+  // Live SLA countdown — runs every 5s, updates each .ack-countdown chip
+  // with its remaining-time label. Switches the chip text/colour when
+  // the deadline is missed; the SLA sweeper on the server then re-fires
+  // an [ESCALATED] alert. We don't poll the server here — the chip is
+  // a UI hint; the source of truth lives in posts.ack_deadline_at.
+  function _fmtRemaining(ms) {
+    const sign = ms < 0 ? '-' : '';
+    const t = Math.abs(Math.floor(ms / 1000));
+    const m = Math.floor(t / 60);
+    const s = t % 60;
+    return sign + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function _tickAckCountdowns() {
+    const now = Date.now();
+    document.querySelectorAll('.ack-countdown').forEach((el) => {
+      const dl = el.dataset.ackDeadline;
+      if (!dl) return;
+      const t = Date.parse(dl);
+      if (Number.isNaN(t)) return;
+      const remaining = t - now;
+      const label = el.querySelector('.ack-countdown-label');
+      if (!label) return;
+      if (remaining > 0) {
+        label.textContent = 'SLA ' + _fmtRemaining(remaining);
+      } else {
+        label.textContent = 'SLA missed ' + _fmtRemaining(remaining);
+        // Visually escalate when missed.
+        el.classList.remove('bg-rose-50', 'text-rose-700', 'border-rose-200');
+        el.classList.add('bg-rose-600', 'text-white', 'border-rose-700');
+      }
+    });
+  }
+  _tickAckCountdowns();
+  setInterval(_tickAckCountdowns, 1000);
+
+  // ── Flip a dropdown menu upward when it would clip the viewport below.
+  // Lives outside any single popover so it works for both row-menus and
+  // playbook-popovers. Runs on toggle (the <details> open/close event).
+  function _flipPopoverIfClipped(detailsEl) {
+    if (!detailsEl.open) return;
+    const popover = detailsEl.querySelector(':scope > div');
+    if (!popover) return;
+    // Reset to default (drop down) before measuring.
+    popover.classList.remove('bottom-full', 'mb-1');
+    popover.classList.add('top-full', 'mt-1');
+    const rect = popover.getBoundingClientRect();
+    const overshoot = rect.bottom - window.innerHeight;
+    if (overshoot > 0) {
+      // Not enough room below — flip to drop UP from the trigger.
+      popover.classList.remove('top-full', 'mt-1');
+      popover.classList.add('bottom-full', 'mb-1');
+    }
+  }
+  document.addEventListener('toggle', (e) => {
+    const t = e.target;
+    if (t && t.matches && t.matches('details[data-row-menu], details[data-pb-menu]')) {
+      _flipPopoverIfClipped(t);
+    }
+  }, true);
+
+  // Close any open popover (<details data-row-menu> overflow menus and
+  // <details data-pb-menu> playbook popovers) when clicking outside.
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('details[data-row-menu][open], details[data-pb-menu][open]').forEach((d) => {
+      if (!d.contains(e.target)) d.removeAttribute('open');
+    });
+  });
+  // Also close on Escape.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('details[data-row-menu][open], details[data-pb-menu][open]').forEach((d) => d.removeAttribute('open'));
+    }
+  });
+</script>
+</body>
+</html>

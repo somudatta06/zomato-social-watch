@@ -1,0 +1,315 @@
+{% import '_icons.html' as icons %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity · Zomato Social Watch</title>
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23E23744'/></svg>">
+<script src="https://cdn.tailwindcss.com?plugins=forms,line-clamp"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          primary:  '#4F46E5',
+          primary2: '#6366F1',
+          ink:      '#0F172A',
+          muted:    '#64748B',
+          subtle:   '#F8FAFC',
+          line:     '#E2E8F0',
+          zomato:   '#E23744',
+        },
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        },
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://rsms.me/">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+  html { font-feature-settings: 'cv11', 'ss01', 'ss03'; }
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .scroll-area::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .nav-item.active { background: #EEF2FF; color: #4338CA; }
+  .nav-item.active .nav-icon { color: #4F46E5; }
+  .chan-slack          { color: #1E40AF; background: #DBEAFE; border: 1px solid #93C5FD; }
+  .chan-discord        { color: #4338CA; background: #EEF2FF; border: 1px solid #C7D2FE; }
+  .chan-email          { color: #166534; background: #DCFCE7; border: 1px solid #86EFAC; }
+  .chan-sheets         { color: #047857; background: #D1FAE5; border: 1px solid #6EE7B7; }
+  .chan-ticket         { color: #5B21B6; background: #EDE9FE; border: 1px solid #C4B5FD; }
+  .chan-twitter_reply  { color: #075985; background: #E0F2FE; border: 1px solid #7DD3FC; }
+  .chan-reddit_comment { color: #9A3412; background: #FFEDD5; border: 1px solid #FDBA74; }
+</style>
+</head>
+<body class="h-screen bg-subtle text-ink">
+
+<div class="flex h-screen overflow-hidden">
+
+  {% include '_sidebar.html' %}
+
+  <main class="flex-1 overflow-y-auto scroll-area">
+
+    <header class="bg-white border-b border-line px-8 py-5 flex items-center sticky top-0 z-10">
+      <div>
+        <h1 class="text-[22px] font-semibold tracking-tight">Activity</h1>
+        <div class="text-[13px] text-muted mt-0.5">
+          What we sent to customers and the team in the last 24 hours.
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <a href="/" class="text-[12px] text-muted hover:text-ink flex items-center gap-1">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+          Back to Home
+        </a>
+        <button onclick="window.location.reload()" class="px-3 py-1.5 rounded-md border border-line text-ink hover:bg-subtle text-[12px] flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="max-w-[1600px] mx-auto px-6 xl:px-10 pt-6 pb-12">
+
+      {# ============================================================
+         HEADLINE — what a CMO opens this page to learn.
+         One sentence, four numbers, no jargon.
+         ============================================================ #}
+      {% set succ_pct = (100 * summary.succeeded / summary.total)|round|int if summary.total else 100 %}
+      <section class="border-b border-line/60 pb-6 mb-6">
+        <p class="text-[10.5px] font-semibold tracking-[0.18em] uppercase text-muted mb-3">Last 24 hours</p>
+        {% if summary.total == 0 %}
+          <h2 class="text-[24px] font-semibold tracking-tight leading-snug max-w-3xl">
+            No actions yet today.
+            <span class="text-muted font-normal">As soon as a critical post lands, you'll see it here.</span>
+          </h2>
+        {% elif summary.failed == 0 %}
+          <h2 class="text-[24px] font-semibold tracking-tight leading-snug max-w-3xl">
+            Shipped <span class="text-emerald-700 tabular-nums">{{ summary.total }}</span>
+            action{{ '' if summary.total == 1 else 's' }} across
+            <span class="tabular-nums">{{ summary.channels_used }}</span> channel{{ '' if summary.channels_used == 1 else 's' }}.
+            <span class="text-muted font-normal">Every escalation reached a destination.</span>
+          </h2>
+        {% else %}
+          <h2 class="text-[24px] font-semibold tracking-tight leading-snug max-w-3xl">
+            Shipped <span class="text-ink tabular-nums">{{ summary.succeeded }}</span> of
+            <span class="tabular-nums">{{ summary.total }}</span>
+            actions ({{ succ_pct }}%).
+            <span class="text-rose-700 font-normal">{{ summary.failed }} failed — see below.</span>
+          </h2>
+        {% endif %}
+
+        {# Four big numbers — the same shape as Briefing/Operations. #}
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-4 mt-6">
+          <div>
+            <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none">{{ summary.total }}</div>
+            <div class="mt-1.5 text-[12.5px] text-muted">Actions fired</div>
+            <div class="text-[11.5px] text-muted/70">last 24 hours</div>
+          </div>
+          <div>
+            <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none {% if summary.failed == 0 and summary.total %}text-emerald-700{% endif %}">{{ succ_pct }}%</div>
+            <div class="mt-1.5 text-[12.5px] text-muted">Success rate</div>
+            <div class="text-[11.5px] text-muted/70">{{ summary.succeeded }} of {{ summary.total }} ok</div>
+          </div>
+          <div>
+            <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none {% if summary.failed %}text-rose-700{% else %}text-muted/40{% endif %}">{{ summary.failed }}</div>
+            <div class="mt-1.5 text-[12.5px] text-muted">Failures</div>
+            <div class="text-[11.5px] text-muted/70">{% if summary.failed %}need investigation{% else %}none — clean run{% endif %}</div>
+          </div>
+          <div>
+            <div class="text-[36px] font-semibold tracking-tight tabular-nums leading-none">{{ summary.channels_used }}</div>
+            <div class="mt-1.5 text-[12.5px] text-muted">Channels used</div>
+            <div class="text-[11.5px] text-muted/70">of {{ known_channels|length }} configured</div>
+          </div>
+        </div>
+      </section>
+
+      {# ============================================================
+         BY CHANNEL — quick "where did things go" rollup.
+         Each card is a clickable filter. Counts use channel-aware nouns
+         ("12 alerts", "47 rows", "5 tickets") so the numbers read like
+         a sentence, not column data.
+         ============================================================ #}
+      <section class="mb-8">
+        <div class="flex items-baseline gap-3 pb-3 mb-4 border-b border-line/60">
+          <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">By channel</h2>
+          <span class="ml-auto text-[11.5px] text-muted">Click a channel to filter the timeline below.</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          <a href="/actions"
+             class="rounded-lg border p-3 transition {% if not active_channel %}bg-ink text-white border-ink{% else %}bg-white border-line hover:border-ink/40 hover:bg-subtle{% endif %}">
+            <div class="flex items-center gap-2 text-[11px] uppercase font-semibold tracking-wider {% if not active_channel %}text-white/80{% else %}text-muted{% endif %}">
+              <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+              All
+            </div>
+            <div class="text-[24px] font-semibold tabular-nums tracking-tight mt-1.5">{{ summary.total }}</div>
+            <div class="text-[11.5px] {% if not active_channel %}text-white/70{% else %}text-muted{% endif %} mt-0.5">total fired</div>
+          </a>
+          {% for c in known_channels %}
+            {% set meta = channel_meta.get(c, {}) %}
+            {% set bc = summary.by_channel.get(c, {'fired': 0, 'failed': 0}) %}
+            {% set is_active = active_channel == c %}
+            <a href="/actions?channel={{ c }}"
+               class="rounded-lg border p-3 transition {% if is_active %}bg-ink text-white border-ink{% elif bc.fired %}bg-white border-line hover:border-ink/40 hover:bg-subtle{% else %}bg-white/60 border-line/60 hover:border-line{% endif %}"
+               title="{{ meta.label or c }}">
+              <div class="flex items-center gap-2 text-[11px] uppercase font-semibold tracking-wider {% if is_active %}text-white/80{% elif bc.fired %}text-muted{% else %}text-muted/60{% endif %}">
+                <i data-lucide="{{ meta.icon or 'circle' }}" class="w-3.5 h-3.5"></i>
+                <span class="truncate">{{ meta.label or c }}</span>
+              </div>
+              <div class="text-[24px] font-semibold tabular-nums tracking-tight mt-1.5 {% if not is_active and not bc.fired %}text-muted/40{% endif %}">{{ bc.fired }}</div>
+              <div class="text-[11.5px] {% if is_active %}text-white/70{% elif bc.fired %}text-muted{% else %}text-muted/50{% endif %} mt-0.5">
+                {% if bc.fired == 0 %}
+                  not used today
+                {% else %}
+                  {{ meta.noun or 'fired' }}
+                  {% if bc.failed %}<span class="{% if is_active %}text-rose-200{% else %}text-rose-600{% endif %}"> · {{ bc.failed }} failed</span>{% endif %}
+                {% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+
+      {# ============================================================
+         FAILURES — only renders when there are any. Surfaces the
+         ones that need investigation BEFORE the user has to scroll
+         a hundred timeline rows to find them.
+         ============================================================ #}
+      {% if summary.failures %}
+      <section class="mb-8">
+        <div class="rounded-lg border border-rose-200 bg-rose-50/50 p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-700"></i>
+            <h2 class="text-[13px] font-semibold text-rose-800">Needs investigation — {{ summary.failed }} action{{ '' if summary.failed == 1 else 's' }} failed</h2>
+          </div>
+          <ul class="space-y-2">
+            {% for f in summary.failures %}
+            {% set fmeta = channel_meta.get(f.channel, {}) %}
+            <li class="text-[13px] text-rose-900 flex items-start gap-3">
+              <span class="text-rose-700 mt-0.5">•</span>
+              <div class="flex-1 min-w-0">
+                <span class="font-medium">{{ fmeta.verb or f.channel }}</span>
+                for
+                <a href="/inbox?q={{ f.post_id|urlencode }}" class="underline hover:no-underline">@{{ (f.post_author or 'anon')|replace('@','') }}</a>
+                failed
+                {% if f.status %}<span class="tabular-nums text-rose-700">(HTTP {{ f.status }})</span>{% endif %}.
+                {% if f.error %}<span class="text-rose-800/90">{{ f.error[:200] }}</span>{% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+      {% endif %}
+
+      {# ============================================================
+         TIMELINE — humanized event stream.
+         Each row reads as a sentence: "12m ago · Replied on X to
+         @rokiie139 · 'We're looking into…' → Open reply".
+         No table, no column headers, no ✓ OK 200.
+         ============================================================ #}
+      <section>
+        <div class="flex items-baseline gap-3 pb-3 mb-4 border-b border-line/60">
+          <h2 class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">
+            {% if active_channel %}{{ (channel_meta.get(active_channel, {}).get('label') or active_channel)|capitalize }} — recent activity{% else %}Recent activity{% endif %}
+          </h2>
+          {% if actions %}
+            <span class="text-[11.5px] text-muted tabular-nums">{{ actions|length }} event{{ '' if actions|length == 1 else 's' }}</span>
+          {% endif %}
+        </div>
+
+        {% if actions %}
+        <ol class="space-y-1">
+          {% for a in actions %}
+          {% set ts_short = (a.ts or '')[:19].replace('T', ' ') %}
+          {% set meta = channel_meta.get(a.channel, {}) %}
+          {% set verb = meta.verb or ('Fired ' ~ a.channel) %}
+          {% set author = (a.post_author or 'anon')|replace('@','') %}
+          <li class="group flex items-start gap-3 py-3 px-2 -mx-2 rounded-md hover:bg-white transition-colors">
+            {# Channel icon swatch (small, color-coded) — visual anchor. #}
+            <div class="flex-shrink-0 mt-0.5 w-6 h-6 rounded-md flex items-center justify-center
+                        {% if a.ok %}chan-{{ a.channel }}{% else %}bg-rose-50 text-rose-700 border border-rose-200{% endif %}">
+              <i data-lucide="{{ meta.icon or 'zap' }}" class="w-3.5 h-3.5"></i>
+            </div>
+
+            <div class="flex-1 min-w-0">
+              {# Sentence: verb + author + urgency chip. The "auto" pill
+                 lights up when this fire came from the auto-reply policy
+                 or the drain modal (vs an operator click). Distinguishes
+                 system-fired from human-fired at a glance. #}
+              <div class="text-[13.5px] text-ink/90 leading-snug flex items-baseline gap-2 flex-wrap">
+                <span class="text-[11px] text-muted tabular-nums whitespace-nowrap">{{ ts_short }}</span>
+                <span class="text-muted/40">·</span>
+                <span class="font-medium">{{ verb }}</span>
+                {% if a.trigger == 'auto_reply_v1' %}
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-700 border border-sky-200"
+                        title="Fired automatically by the auto-reply policy (Phase μ).">
+                    <i data-lucide="zap" class="w-2.5 h-2.5"></i>auto
+                  </span>
+                {% elif a.trigger == 'drain_v1' %}
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200"
+                        title="Fired by an operator-confirmed drain run.">
+                    <i data-lucide="zap" class="w-2.5 h-2.5"></i>drain
+                  </span>
+                {% endif %}
+                <span class="text-muted">to</span>
+                <a href="/inbox?q={{ a.post_id|urlencode }}" class="font-medium hover:underline">@{{ author }}</a>
+                {% if a.priority_band %}{{ icons.urgency_chip(a.priority_band, size='xs') }}{% endif %}
+                {% if not a.ok %}
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                    <i data-lucide="x" class="w-2.5 h-2.5"></i> failed
+                  </span>
+                {% endif %}
+              </div>
+
+              {# Quote of the post (so you remember WHAT this was about). #}
+              {% if a.post_excerpt %}
+              <p class="mt-1 text-[12.5px] text-muted/90 line-clamp-1 leading-snug">"{{ a.post_excerpt }}"</p>
+              {% endif %}
+
+              {# Error inline (only on failures). #}
+              {% if not a.ok and a.error %}
+              <p class="mt-1 text-[11.5px] text-rose-700 line-clamp-2">{{ a.error }}</p>
+              {% endif %}
+            </div>
+
+            {# Outcome link — clickable artifact (Slack msg, ticket, reply, etc). #}
+            {% if a.target %}
+            <a href="{{ a.target }}" target="_blank" rel="noopener noreferrer"
+               class="flex-shrink-0 self-center text-[12px] text-primary hover:underline whitespace-nowrap inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+               title="Open the {{ meta.label or a.channel }}">
+              Open <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <div class="py-16 text-center bg-white rounded-lg border border-line/60">
+          <i data-lucide="inbox" class="w-8 h-8 text-muted/40 mx-auto mb-2"></i>
+          <div class="text-[15px] font-semibold mb-1">Nothing here yet</div>
+          <div class="text-[13px] text-muted">
+            {% if active_channel %}
+              The {{ (channel_meta.get(active_channel, {}).get('label') or active_channel)|lower }} channel hasn't fired in the last 24 hours.
+              <a href="/actions" class="text-primary hover:underline">See all activity</a>.
+            {% else %}
+              Activity will show up here as the system fires actions on critical posts.
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# Reddit: public JSON endpoints over httpx (no auth). PRAW removed because
+# Reddit's Responsible Builder Policy (Nov 2025) requires 7-day pre-approval
+# for new OAuth apps. Re-add `praw>=7.7.1` if/when an approved client lands.
+#
+# Twitter: Playwright + saved cookies (twscrape's GraphQL parser is broken
+# against Twitter's current API as of Apr 2026). After install, run:
+#   .venv/bin/playwright install chromium
+playwright>=1.48
+httpx>=0.27
+beautifulsoup4>=4.12
+python-dotenv>=1.0
+loguru>=0.7
+aiosqlite>=0.20
+
+# Phase 2 — classifier: Gemini 2.5 Flash (free-tier-generous, structured JSON
+# via Pydantic schema). Chosen over Claude/OpenAI for cost; 250 RPD + 1M
+# tokens/day on free tier covers this project end-to-end.
+google-genai>=1.0
+pydantic>=2.0
+pyyaml>=6.0
+
+# Phase 4 — Claude-drafted reply suggestions for high-priority posts.
+# Brief asks for "AI-Native using Claude.ai"; we use Anthropic for the
+# customer-facing reply drafts (where tone matters most) and keep Gemini
+# on the classifier path (cheap, structured, batched).
+anthropic>=0.40
+
+# Phase 3 — dashboard: FastAPI + Jinja2 + Tailwind via CDN.
+# No JS framework; minimal HTMX may be added later for partial updates.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+jinja2>=3.1

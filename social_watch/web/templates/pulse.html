@@ -1,0 +1,782 @@
+{% import '_icons.html' as icons %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · Zomato Social Watch</title>
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23E23744'/></svg>">
+<script src="https://cdn.tailwindcss.com?plugins=forms,line-clamp"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          primary:  '#4F46E5',
+          primary2: '#6366F1',
+          ink:      '#0F172A',
+          muted:    '#64748B',
+          subtle:   '#F8FAFC',
+          line:     '#E2E8F0',
+          zomato:   '#E23744',
+        },
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        },
+        boxShadow: {
+          card: '0 1px 2px 0 rgba(15,23,42,0.04), 0 1px 3px 0 rgba(15,23,42,0.06)',
+        },
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://rsms.me/">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+  html { font-feature-settings: 'cv11', 'ss01', 'ss03'; }
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .scroll-area::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .nav-item.active { background: #EEF2FF; color: #4338CA; }
+  .nav-item.active .nav-icon { color: #4F46E5; }
+  .pri-P0 { color: #FFFFFF; background: #DC2626; border: 1px solid #B91C1C; font-weight: 600; }
+  .pri-P1 { color: #C2410C; background: #FFEDD5; border: 1px solid #FDBA74; font-weight: 600; }
+  .pri-P2 { color: #1D4ED8; background: #DBEAFE; border: 1px solid #93C5FD; }
+  .pri-P3 { color: #64748B; background: #F1F5F9; border: 1px solid #CBD5E1; }
+  .badge-reddit  { color: #FFFFFF; background: #FF4500; }
+  .badge-twitter { color: #FFFFFF; background: #0F172A; }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  /* Bar chart bar tooltip on hover */
+  .bar-col:hover .bar-tip { opacity: 1; }
+  .bar-tip { opacity: 0; transition: opacity 120ms ease; pointer-events: none; }
+  /* Ticker pulse */
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+</style>
+</head>
+<body class="h-screen bg-subtle text-ink">
+
+<div class="flex h-screen overflow-hidden">
+
+  {% include '_sidebar.html' %}
+
+  <main class="flex-1 overflow-y-auto scroll-area">
+
+    <!-- Page header -->
+    <header class="bg-white border-b border-line px-8 py-5 flex items-center sticky top-0 z-10">
+      <div>
+        <h1 class="text-[22px] font-semibold tracking-tight">Home</h1>
+        <div class="text-[13px] text-muted mt-0.5">Today's activity at a glance</div>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        {% if last_sync_iso %}
+          <span class="flex items-center gap-1.5 text-[12px] text-muted">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-dot"></span>
+            Live · last sync {{ last_sync_ago }}
+          </span>
+        {% endif %}
+        <button onclick="window.location.reload()" class="px-3 py-1.5 rounded-md border border-line text-ink hover:bg-subtle text-[12px] flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="px-8 py-6 space-y-6">
+
+      <!-- ============================================================
+           Connectors strip — at-a-glance system health.
+           Read-only snapshot of all 6 channels (2 read scrapers + 4
+           write/reply connectors). Each chip clicks through to the
+           audit log filtered to that channel.
+           ============================================================ -->
+      <div class="bg-white border border-line rounded-lg px-4 py-3">
+        <div class="flex items-center gap-3 flex-wrap text-[12px]">
+          <div class="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted whitespace-nowrap">
+            <i data-lucide="cable" class="w-3.5 h-3.5"></i>
+            Connectors
+          </div>
+          {# Read-only scrapers — always present, status is a binary
+             "did the last sync succeed". We don't have per-source success
+             tracking yet; show a neutral chip. #}
+          <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-line text-ink"
+                title="Reddit scraper — public JSON endpoints">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Reddit <span class="text-muted text-[11px]">R</span>
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-line text-ink"
+                title="Twitter scraper — Playwright + saved cookies. Reply path uses the same session.">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Twitter <span class="text-muted text-[11px]">R+W</span>
+          </span>
+          {# Write / reply connectors. Color = configured status; tooltip = last fire. #}
+          {% for c in connectors %}
+            {% set ago = '' %}
+            {% if c.last_fired_at %}
+              {% set ago = ' (last ' ~ c.last_fired_at[:16].replace('T',' ') ~ ' UTC)' %}
+            {% endif %}
+            {% set tip %}
+              {{ c.name }} · {{ c.direction }} · {{ 'configured' if c.configured else 'NOT configured' }}{{ ago }}{% if c.fire_count_24h %} · {{ c.fire_count_24h }} fires (24h){% endif %}
+            {% endset %}
+            <a href="/actions?channel={{ c.name }}"
+               class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-line text-ink hover:bg-subtle"
+               title="{{ tip|striptags|trim }}">
+              <span class="w-1.5 h-1.5 rounded-full {% if c.configured and (c.last_fire_ok or c.last_fire_ok is none) %}bg-emerald-500{% elif c.configured %}bg-amber-500{% else %}bg-slate-300{% endif %}"></span>
+              {% if c.name == 'twitter_reply' %}Twitter reply
+              {% elif c.name == 'reddit_comment' %}Reddit comment
+              {% elif c.name == 'ticket' %}Ticket
+              {% else %}{{ c.name|capitalize }}{% endif %}
+              <span class="text-muted text-[11px]">{{ c.direction }}</span>
+              {% if c.fire_count_24h %}<span class="text-muted/70 text-[11px] tabular-nums">· {{ c.fire_count_24h }}</span>{% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Hero ticker — at-a-glance one-liner.
+           ============================================================ -->
+      {% set top_theme = themes_with_lead[0] if themes_with_lead else None %}
+      {% if kpis.overdue and kpis.overdue >= 50 %}
+        {% set ticker_color = "bg-rose-50 border-rose-200 text-rose-800" %}
+        {% set ticker_icon = "alert-triangle" %}
+        {% set ticker_text = "Action needed: " ~ kpis.overdue ~ " critical posts unanswered for over 2 hours." %}
+      {% elif top_theme and top_theme.member_count >= 30 %}
+        {% set ticker_color = "bg-amber-50 border-amber-200 text-amber-800" %}
+        {% set ticker_icon = "trending-up" %}
+        {% set ticker_text = "Spiking now: " ~ top_theme.display_name ~ " · " ~ top_theme.member_count ~ " posts in 24h." %}
+      {% elif kpis.today.delta_pct > 25 %}
+        {% set ticker_color = "bg-amber-50 border-amber-200 text-amber-800" %}
+        {% set ticker_icon = "trending-up" %}
+        {% set ticker_text = "Volume up " ~ '%.0f'|format(kpis.today.delta_pct) ~ "% vs yesterday. Keep an eye on the queue." %}
+      {% else %}
+        {% set ticker_color = "bg-emerald-50 border-emerald-200 text-emerald-800" %}
+        {% set ticker_icon = "check-circle-2" %}
+        {% set ticker_text = "All clear. Volume and sentiment are within normal range." %}
+      {% endif %}
+      {# When the ticker is the overdue alert, make it a clickable CTA
+         that opens the drain modal. Other ticker states stay as
+         passive headlines. #}
+      {% set _ticker_is_overdue = kpis.overdue and kpis.overdue >= 50 %}
+      {% if _ticker_is_overdue %}
+        <button type="button"
+                onclick="openDrainModal()"
+                class="w-full border rounded-lg px-4 py-3 flex items-center gap-3 hover:brightness-95 cursor-pointer text-left {{ ticker_color }}">
+          <i data-lucide="{{ ticker_icon }}" class="w-4 h-4 flex-shrink-0"></i>
+          <div class="flex-1 text-[13px] font-medium">{{ ticker_text }}</div>
+          <span class="inline-flex items-center gap-1 text-[12px] font-semibold whitespace-nowrap">
+            Drain the queue
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </span>
+        </button>
+      {% else %}
+        <div class="border rounded-lg px-4 py-3 flex items-center gap-3 {{ ticker_color }}">
+          <i data-lucide="{{ ticker_icon }}" class="w-4 h-4 flex-shrink-0"></i>
+          <div class="text-[13px] font-medium">{{ ticker_text }}</div>
+        </div>
+      {% endif %}
+
+      {# ── Drain modal ─────────────────────────────────────────────
+         Three states (controlled by JS):
+           1. preview: show counts + breakdown + sample reply
+           2. running: progress bar, live counter, cancel button
+           3. done:    final summary, close button
+         ────────────────────────────────────────────────────────────── #}
+      <div id="drainModal"
+           class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/40 backdrop-blur-[2px]"
+           onclick="if (event.target === this) closeDrainModal()">
+        <div class="bg-white rounded-xl shadow-[0_24px_48px_-12px_rgba(15,23,42,0.22)] w-[640px] max-w-[94vw] max-h-[90vh] overflow-hidden flex flex-col">
+          <div class="px-6 pt-5 pb-3 flex items-start gap-2 border-b border-line/60">
+            <div class="flex-1 min-w-0">
+              <h2 class="text-[16px] font-semibold tracking-tight">Drain the backlog</h2>
+              <p class="text-[12px] text-muted mt-0.5">Bulk-fire templated Twitter replies on safe customer-care posts. Sensitive incidents are skipped automatically.</p>
+            </div>
+            <button onclick="closeDrainModal()" class="w-8 h-8 -mt-1 -mr-1 rounded-md hover:bg-subtle flex items-center justify-center text-muted hover:text-ink" title="Close (esc)">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-6 space-y-5">
+            {# Stage 1: PREVIEW — loads counts on open #}
+            <div id="drainStagePreview">
+              <div id="drainPreviewLoading" class="py-8 text-center">
+                <div class="inline-flex items-center gap-2 text-[13px] text-muted">
+                  <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="9" stroke-opacity="0.25"/>
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/>
+                  </svg>
+                  Scanning the overdue queue…
+                </div>
+              </div>
+              <div id="drainPreviewBody" class="hidden space-y-4">
+                <div class="grid grid-cols-3 gap-3">
+                  <div class="rounded-lg border border-line p-3 bg-white">
+                    <div class="text-[10.5px] uppercase font-semibold tracking-wider text-muted">Total overdue</div>
+                    <div id="drainPvTotal" class="text-[24px] font-semibold tabular-nums">—</div>
+                  </div>
+                  <div class="rounded-lg border border-emerald-200 p-3 bg-emerald-50/50">
+                    <div class="text-[10.5px] uppercase font-semibold tracking-wider text-emerald-700">Auto-eligible</div>
+                    <div id="drainPvEligible" class="text-[24px] font-semibold tabular-nums text-emerald-700">—</div>
+                    <div class="text-[11px] text-emerald-700/80">safe to template</div>
+                  </div>
+                  <div class="rounded-lg border border-amber-200 p-3 bg-amber-50/50">
+                    <div class="text-[10.5px] uppercase font-semibold tracking-wider text-amber-700">Need human</div>
+                    <div id="drainPvNeeds" class="text-[24px] font-semibold tabular-nums text-amber-700">—</div>
+                    <div class="text-[11px] text-amber-700/80">skipped automatically</div>
+                  </div>
+                </div>
+
+                <div id="drainSampleReply" class="hidden rounded-lg border border-line p-3 bg-subtle/40">
+                  <div class="text-[10.5px] uppercase font-semibold tracking-wider text-muted mb-1.5">Each eligible post will receive</div>
+                  <p id="drainSampleText" class="text-[12.5px] text-ink/85 leading-relaxed">—</p>
+                </div>
+
+                <div>
+                  <div class="text-[10.5px] uppercase font-semibold tracking-wider text-muted mb-1.5">What gets skipped (and why)</div>
+                  <ul id="drainNeedsBreakdown" class="space-y-1 text-[12.5px] text-ink/85"></ul>
+                </div>
+
+                <label class="flex items-center gap-2 text-[12.5px] text-ink/90">
+                  <span class="text-muted">Throttle:</span>
+                  <select id="drainThrottle" class="px-2 py-1 border border-line rounded-md text-[12.5px]">
+                    <option value="1">1 reply / sec (safest)</option>
+                    <option value="2">2 replies / sec</option>
+                    <option value="3">3 replies / sec</option>
+                    <option value="5">5 replies / sec (max)</option>
+                  </select>
+                </label>
+
+                <div class="mt-2 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 text-[11.5px] text-slate-600 flex items-start gap-1.5 leading-snug">
+                  <i data-lucide="info" class="w-3 h-3 mt-0.5 flex-shrink-0"></i>
+                  <span>Drain is <b>Twitter-only</b> for now. Reddit auto-reply is on the roadmap — until then, handle Reddit posts individually with the per-row <b>Comment</b> button.</span>
+                </div>
+              </div>
+              <div id="drainPreviewError" class="hidden p-3 rounded-lg bg-rose-50 border border-rose-200 text-[12.5px] text-rose-800">—</div>
+            </div>
+
+            {# Stage 2: RUNNING — progress bar + live tail #}
+            <div id="drainStageRunning" class="hidden space-y-3">
+              <div class="flex items-baseline gap-3">
+                <div class="text-[14px] font-semibold">Posting replies…</div>
+                <div id="drainRunCounter" class="ml-auto text-[12.5px] tabular-nums text-muted">0 / 0</div>
+              </div>
+              <div class="h-2 bg-subtle rounded-full overflow-hidden">
+                <div id="drainProgressBar" class="h-full bg-emerald-500 transition-all" style="width: 0%"></div>
+              </div>
+              <div class="text-[11.5px] text-muted">
+                <span id="drainRunStats">fired 0 · skipped 0 · failed 0</span>
+              </div>
+              <div id="drainRunTail" class="rounded-md border border-line bg-subtle/40 max-h-[180px] overflow-y-auto p-2 space-y-0.5 text-[11.5px] font-mono"></div>
+            </div>
+
+            {# Stage 3: DONE — summary #}
+            <div id="drainStageDone" class="hidden space-y-2">
+              <div class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                <div class="text-[14px] font-semibold text-emerald-800" id="drainDoneHeadline">—</div>
+                <div class="text-[12px] text-emerald-700 mt-1" id="drainDoneSubtext">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-4 flex items-center gap-2 border-t border-line/60">
+            <button onclick="closeDrainModal()" class="text-[12.5px] text-muted hover:text-ink px-2">Cancel</button>
+            <div class="ml-auto flex items-center gap-2">
+              <button id="drainCancelBtn" onclick="cancelDrainRun()"
+                      class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium border border-line rounded-md hover:bg-subtle">
+                <i data-lucide="square" class="w-3.5 h-3.5"></i> Stop
+              </button>
+              <button id="drainStartBtn" onclick="startDrainRun()" disabled
+                      class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12.5px] font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-md disabled:opacity-40 disabled:cursor-not-allowed">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                <span id="drainStartLabel">Drain</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           KPI strip — 4 large cards, click-through to filtered Inbox.
+           ============================================================ -->
+      <section class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <a href="/inbox?window=day" class="bg-white border border-line rounded-xl p-5 hover:border-primary/40 hover:shadow-card transition group">
+          <div class="text-[11px] text-muted uppercase tracking-wider font-semibold">Mentions today</div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <div class="text-[32px] font-semibold tracking-tight tabular-nums">{{ kpis.today.count }}</div>
+            {% if kpis.today.delta_pct > 0.5 %}
+              <div class="text-[12px] text-rose-600 font-semibold flex items-center gap-0.5">
+                <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+                {{ '%.0f'|format(kpis.today.delta_pct) }}%
+              </div>
+            {% elif kpis.today.delta_pct < -0.5 %}
+              <div class="text-[12px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                <i data-lucide="arrow-down-right" class="w-3 h-3"></i>
+                {{ '%.0f'|format(kpis.today.delta_pct|abs) }}%
+              </div>
+            {% endif %}
+          </div>
+          <div class="text-[11.5px] text-muted mt-1">
+            {% if kpis.today.delta_abs > 0 %}{{ kpis.today.delta_abs }} more than yesterday ({{ kpis.yesterday }})
+            {% elif kpis.today.delta_abs < 0 %}{{ kpis.today.delta_abs|abs }} fewer than yesterday ({{ kpis.yesterday }})
+            {% else %}Same as yesterday ({{ kpis.yesterday }}){% endif %}
+          </div>
+        </a>
+
+        <a href="/inbox?urgency=critical&window=day" class="bg-white border border-line rounded-xl p-5 hover:border-red-300 hover:shadow-card transition"
+           title="Critical posts need a reply within 15 minutes — wake the team. Click to filter the inbox.">
+          <div class="text-[11px] text-muted uppercase tracking-wider font-semibold flex items-center gap-1.5">
+            <i data-lucide="alert-triangle" class="w-3 h-3 text-red-600"></i>
+            <span>Critical now</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <div class="text-[32px] font-semibold tracking-tight tabular-nums text-red-600">{{ kpis.p0 }}</div>
+          </div>
+          <div class="text-[11.5px] text-muted mt-1">Reply within 15 min</div>
+        </a>
+
+        <a href="/inbox?overdue=1&window=week&sort=created" class="bg-white border border-line rounded-xl p-5 hover:border-amber-300 hover:shadow-card transition"
+           title="Critical and High urgency posts that have been waiting more than 2 hours for a reply. The action queue.">
+          <div class="text-[11px] text-muted uppercase tracking-wider font-semibold flex items-center gap-1.5">
+            <i data-lucide="clock-alert" class="w-3 h-3 text-amber-600"></i>
+            <span>Overdue</span>
+            {% if kpis.overdue >= 50 %}<i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600"></i>{% endif %}
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <div class="text-[32px] font-semibold tracking-tight tabular-nums text-amber-700">{{ kpis.overdue }}</div>
+          </div>
+          <div class="text-[11.5px] text-muted mt-1">Critical &amp; High waiting &gt;2h</div>
+        </a>
+
+        <a href="/inbox?response=replied&window=day" class="bg-white border border-line rounded-xl p-5 hover:border-emerald-300 hover:shadow-card transition">
+          <div class="text-[11px] text-muted uppercase tracking-wider font-semibold">Replied</div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <div class="text-[32px] font-semibold tracking-tight tabular-nums text-emerald-600">{{ kpis.replied.count }}</div>
+            <div class="text-[12px] text-muted font-medium">{{ '%.0f'|format(kpis.replied.rate_pct) }}% rate</div>
+          </div>
+          <div class="text-[11.5px] text-muted mt-1">@zomatocare reply detected</div>
+        </a>
+
+        {# Auto-replied KPI tile (Phase μ). Click → Activity log filtered
+           to auto/drain triggers. Renders even at 0 so the demo audience
+           sees the metric exists; it lights up when AUTO_REPLY_ENABLED=1
+           or after a drain run. #}
+        <a href="/actions?channel=twitter_reply&trigger=auto_reply_v1" class="bg-white border border-line rounded-xl p-5 hover:border-sky-300 hover:shadow-card transition"
+           title="Templated replies fired by the auto-reply policy or the drain modal. Click to view the audit trail.">
+          <div class="text-[11px] text-muted uppercase tracking-wider font-semibold flex items-center gap-1.5">
+            <i data-lucide="zap" class="w-3 h-3 text-sky-600"></i>
+            <span>Auto-replied</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <div class="text-[32px] font-semibold tracking-tight tabular-nums {% if kpis.auto_replied.count %}text-sky-700{% else %}text-muted/40{% endif %}">{{ kpis.auto_replied.count }}</div>
+            {% if kpis.auto_replied.avg_ttr_seconds %}
+              {% set _ttr_s = kpis.auto_replied.avg_ttr_seconds|round|int %}
+              {% if _ttr_s < 120 %}
+                <div class="text-[12px] text-muted font-medium">avg {{ _ttr_s }}s</div>
+              {% else %}
+                <div class="text-[12px] text-muted font-medium">avg {{ (_ttr_s / 60)|round|int }}m</div>
+              {% endif %}
+            {% endif %}
+          </div>
+          <div class="text-[11.5px] text-muted mt-1 flex items-center gap-1.5">
+            <span>Twitter only</span>
+            <span class="text-muted/50">·</span>
+            <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded bg-slate-100 text-slate-600 border border-slate-200 text-[9.5px] font-semibold uppercase tracking-wider"
+                  title="Reddit auto-reply is on the roadmap. For now, use the manual 'Comment on Reddit' button on each row.">
+              Reddit soon
+            </span>
+          </div>
+        </a>
+      </section>
+
+      <!-- ============================================================
+           Volume chart — hourly mentions, last 24h, with negative split.
+           ============================================================ -->
+      <section class="bg-white border border-line rounded-xl p-5">
+        <div class="flex items-baseline justify-between mb-4">
+          <div>
+            <div class="text-[14px] font-semibold">Volume by hour</div>
+            <div class="text-[12px] text-muted mt-0.5">Last 24 hours · negative sentiment shown in red</div>
+          </div>
+          <div class="text-[11px] text-muted flex items-center gap-3">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-slate-300"></span> All</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500"></span> Negative</span>
+          </div>
+        </div>
+        {% if kpis.hourly and kpis.hourly|length > 0 %}
+          {% set max_total = kpis.hourly|map(attribute='total')|max %}
+          {% if max_total < 1 %}{% set max_total = 1 %}{% endif %}
+          <div class="flex items-end gap-1 h-36 relative">
+            {% for h in kpis.hourly %}
+              {% set total_pct = h.total * 100 / max_total %}
+              {% set neg_pct = h.neg * 100 / max_total %}
+              <div class="flex-1 flex flex-col justify-end items-stretch relative bar-col h-full" >
+                <div class="bg-slate-300 rounded-t-sm relative" style="height: {{ total_pct }}%">
+                  <div class="bg-rose-500 absolute bottom-0 left-0 right-0 rounded-t-sm" style="height: {% if total_pct > 0 %}{{ (h.neg * 100 / h.total) if h.total > 0 else 0 }}%{% else %}0%{% endif %}"></div>
+                </div>
+                <div class="bar-tip absolute -top-10 left-1/2 -translate-x-1/2 bg-ink text-white text-[11px] rounded px-2 py-1 whitespace-nowrap z-10">
+                  {{ h.hr.split(' ')[1] if h.hr else '' }}:00 · {{ h.total }} posts{% if h.neg %} · {{ h.neg }} neg{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="flex justify-between text-[10.5px] text-muted mt-2">
+            <span>{{ kpis.hourly[0].hr.split(' ')[1] if kpis.hourly else '' }}:00 (24h ago)</span>
+            <span>now</span>
+          </div>
+        {% else %}
+          <div class="text-[12px] text-muted/70 italic py-8 text-center">No data in the last 24 hours.</div>
+        {% endif %}
+      </section>
+
+      <!-- ============================================================
+           What's spiking — top theme cards with lead post excerpt.
+           This is the "what are consumers saying" answer.
+           ============================================================ -->
+      <section>
+        <div class="flex items-baseline mb-3">
+          <h2 class="text-[15px] font-semibold tracking-tight">What's spiking</h2>
+          <span class="ml-2 text-[12px] text-muted">Top complaint themes from the last 24 hours</span>
+          <a href="/inbox?window=day" class="ml-auto text-[12px] text-primary hover:underline flex items-center gap-1">See all<i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+        </div>
+        {% if themes_with_lead %}
+        <div class="grid grid-cols-2 gap-4">
+          {% for t in themes_with_lead %}
+          {% set sev_bg = {'critical': 'bg-red-50', 'high': 'bg-amber-50', 'medium': 'bg-indigo-50', 'low': 'bg-slate-50'} %}
+          {% set sev_fg = {'critical': 'text-red-600', 'high': 'text-amber-700', 'medium': 'text-indigo-600', 'low': 'text-slate-600'} %}
+          {% set sev_count_fg = {'critical': 'text-red-600', 'high': 'text-amber-700', 'medium': 'text-ink/80', 'low': 'text-muted'} %}
+          <a href="/inbox?cluster_id={{ t.id }}&page=1" class="bg-white border border-line rounded-xl p-4 hover:border-primary/40 hover:shadow-card transition flex flex-col gap-3">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 {{ sev_bg.get(t.severity, 'bg-slate-50') }}">
+                <i data-lucide="{% if t.cluster_type == 'theme' %}message-circle{% else %}layers{% endif %}"
+                   class="w-5 h-5 {{ sev_fg.get(t.severity, 'text-slate-600') }}"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <div class="text-[14px] font-semibold truncate">{{ t.display_name }}</div>
+                  <div class="text-[14px] font-semibold flex-shrink-0 tabular-nums {{ sev_count_fg.get(t.severity, 'text-muted') }}">{{ t.member_count }}</div>
+                </div>
+                {% if t.audience %}
+                <div class="text-[11px] text-muted mt-0.5">→ {{ t.audience|join(', ') }}</div>
+                {% endif %}
+              </div>
+            </div>
+            {% if t.lead_excerpt %}
+            <div class="text-[12.5px] text-ink/80 leading-snug border-l-2 border-line pl-3 italic">"{{ t.lead_excerpt }}"</div>
+            <div class="text-[11px] text-muted flex items-center gap-1.5">
+              {% if t.lead_author %}<span>@{{ t.lead_author|replace('@','') }}</span>{% endif %}
+              {% if t.lead_band %}{{ icons.urgency_chip(t.lead_band, size='xs') }}{% endif %}
+            </div>
+            {% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white border border-line rounded-xl p-6 text-[13px] text-muted/70 italic">
+          No active themes detected yet. Themes appear when 3+ posts share a complaint pattern in 24h.
+        </div>
+        {% endif %}
+      </section>
+
+      <!-- ============================================================
+           Action queue — top 5 P0 unanswered. The "what do I do next?"
+           ============================================================ -->
+      <section>
+        <div class="flex items-baseline mb-3">
+          <h2 class="text-[15px] font-semibold tracking-tight">Action queue</h2>
+          <span class="ml-2 text-[12px] text-muted">Top P0 posts that need a reply</span>
+          <a href="/inbox?overdue=1&window=week&sort=created" class="ml-auto text-[12px] text-primary hover:underline flex items-center gap-1">See all<i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+        </div>
+        {% if action_q %}
+        <div class="bg-white border border-line rounded-xl divide-y divide-line">
+          {% for p in action_q %}
+          {# Per-post action state — same logic as inbox, abridged for the
+             home glance view. Status chip says what HAPPENED, not "verified". #}
+          {% set _taken = (p.action_taken or '').split('+') if p.action_taken else [] %}
+          {% set _replied = ('twitter_reply' in _taken) or ('reddit_comment' in _taken) %}
+          {% set _ticketed = 'ticket' in _taken %}
+          {% set _alerted = ('slack' in _taken) or ('discord' in _taken) or ('email' in _taken) %}
+          {# Whole row is a link to the inbox filtered to this author's recent
+             posts — the operator lands inside our app where the row-level
+             actions live. We never send them out to x.com mid-triage. #}
+          <a href="/inbox?q={{ (p.author or '')|replace('@','')|urlencode }}&window=day&sort=priority"
+             class="px-5 py-4 flex items-start gap-4 hover:bg-subtle/50 transition group">
+            <div class="flex-shrink-0 mt-0.5">
+              {{ icons.urgency_chip(p.priority_band, size='sm') }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline gap-2 mb-1 flex-wrap">
+                <div class="text-[12.5px] font-semibold">@{{ (p.author or 'anon')|replace('@','') }}</div>
+                <div class="text-[11px] text-muted">{{ p.source|capitalize }} · {{ p.ago }}</div>
+                {% if p.cls and p.cls.tripwires_fired %}
+                  {% for tw in p.cls.tripwires_fired[:1] %}
+                  <span class="px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold bg-rose-50 text-rose-700 border border-rose-200">{{ tw|replace('_', ' ') }}</span>
+                  {% endfor %}
+                {% endif %}
+              </div>
+              <div class="text-[13px] text-ink/85 line-clamp-2 leading-snug">{{ p.content }}</div>
+            </div>
+            {# Status chip — single source of truth across home + inbox. #}
+            <div class="flex items-center gap-2 flex-shrink-0">
+              {% if _replied %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-medium whitespace-nowrap">
+                  <i data-lucide="check" class="w-3 h-3"></i> Replied
+                </span>
+              {% elif _ticketed %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-medium whitespace-nowrap">
+                  <i data-lucide="ticket" class="w-3 h-3"></i> Ticketed
+                </span>
+              {% elif _alerted %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium whitespace-nowrap">
+                  <i data-lucide="check" class="w-3 h-3"></i> Alerted
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium whitespace-nowrap">
+                  <i data-lucide="clock" class="w-3 h-3"></i> Awaiting
+                </span>
+              {% endif %}
+              <span class="inline-flex items-center gap-1 text-[12px] text-primary group-hover:underline whitespace-nowrap">
+                Handle <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+              </span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white border border-line rounded-xl p-6 text-[13px] text-muted/70 italic">
+          No P0 posts in the action queue. You're caught up.
+        </div>
+        {% endif %}
+      </section>
+
+      <!-- ============================================================
+           Latest activity — newest posts ticker.
+           ============================================================ -->
+      <section>
+        <div class="flex items-baseline mb-3">
+          <h2 class="text-[15px] font-semibold tracking-tight">Latest activity</h2>
+          <span class="ml-2 text-[12px] text-muted">Newest posts across all sources</span>
+          <a href="/inbox?sort=created" class="ml-auto text-[12px] text-primary hover:underline flex items-center gap-1">Open inbox<i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+        </div>
+        <div class="bg-white border border-line rounded-xl divide-y divide-line">
+          {% for p in latest %}
+          <a href="{{ p.url }}" target="_blank" rel="noopener" class="px-5 py-3 flex items-baseline gap-3 hover:bg-subtle/50 transition">
+            <div class="text-[11px] text-muted w-14 flex-shrink-0 tabular-nums">{{ p.ago }}</div>
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0 {% if p.source == 'reddit' %}bg-[#FF4500]{% else %}bg-black{% endif %} text-white">{{ icons.source_logo(p.source, size='11') }}</span>
+            <span class="text-[12px] text-muted flex-shrink-0 truncate max-w-[160px]">@{{ (p.author or 'anon')|replace('@','') }}</span>
+            <div class="flex-1 min-w-0 text-[12.5px] text-ink/85 truncate">{{ p.content }}</div>
+            {{ icons.urgency_chip(p.priority_band, size='xs') }}
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <div class="text-[11.5px] text-muted text-center pt-4 pb-8">
+        Real-time social listening across Reddit + Twitter/X · {{ now }}
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+
+  // ---- Drain modal ------------------------------------------------------
+  // Three stages controlled by visibility of the relevant <div>:
+  //   #drainStagePreview / #drainStageRunning / #drainStageDone
+  // The Start button only enables after the preview returns ≥1 eligible.
+  // Run state polls /api/drain/status/{job_id} every 1s until finished.
+  let _drainEligibleIds = [];
+  let _drainJobId = null;
+  let _drainPoll  = null;
+  let _drainAutoRefreshSuppressed = false;
+
+  function _showDrainStage(name) {
+    ['drainStagePreview', 'drainStageRunning', 'drainStageDone'].forEach((id) => {
+      document.getElementById(id).classList.toggle('hidden', id !== 'drainStage' + name);
+    });
+    // Footer buttons: Start only on Preview, Cancel only on Running.
+    document.getElementById('drainStartBtn').classList.toggle('hidden',  name !== 'Preview');
+    document.getElementById('drainCancelBtn').classList.toggle('hidden', name !== 'Running');
+  }
+
+  async function openDrainModal() {
+    const modal = document.getElementById('drainModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    _drainAutoRefreshSuppressed = true; // pause the page-reload while modal is open
+    _showDrainStage('Preview');
+    document.getElementById('drainPreviewLoading').classList.remove('hidden');
+    document.getElementById('drainPreviewBody').classList.add('hidden');
+    document.getElementById('drainPreviewError').classList.add('hidden');
+    document.getElementById('drainStartBtn').disabled = true;
+    document.getElementById('drainStartLabel').textContent = 'Drain';
+
+    try {
+      const resp = await fetch('/api/drain/preview');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const d = await resp.json();
+      _drainEligibleIds = d.eligible_post_ids || [];
+      document.getElementById('drainPvTotal').textContent     = d.total_overdue;
+      document.getElementById('drainPvEligible').textContent  = d.eligible_count;
+      document.getElementById('drainPvNeeds').textContent     = d.needs_review_count;
+
+      // Sample reply
+      if (d.sample_replies && d.sample_replies.length) {
+        document.getElementById('drainSampleText').textContent =
+          '"' + d.sample_replies[0].reply_text + '"';
+        document.getElementById('drainSampleReply').classList.remove('hidden');
+      }
+
+      // Needs-review breakdown
+      const ul = document.getElementById('drainNeedsBreakdown');
+      ul.innerHTML = '';
+      const entries = Object.entries(d.needs_review_breakdown || {});
+      entries.sort((a, b) => b[1] - a[1]);
+      if (!entries.length) {
+        const li = document.createElement('li');
+        li.className = 'text-muted italic';
+        li.textContent = 'Nothing skipped — every overdue post is auto-eligible.';
+        ul.appendChild(li);
+      } else {
+        for (const [label, count] of entries.slice(0, 8)) {
+          const li = document.createElement('li');
+          li.className = 'flex items-baseline justify-between gap-3';
+          li.innerHTML = '<span>' + label.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) + '</span>' +
+                         '<span class="tabular-nums text-muted">' + count + '</span>';
+          ul.appendChild(li);
+        }
+      }
+
+      // Update Start button label + enable.
+      const n = d.eligible_count || 0;
+      document.getElementById('drainStartLabel').textContent =
+        n > 0 ? ('Drain ' + n + ' post' + (n === 1 ? '' : 's')) : 'Nothing eligible';
+      document.getElementById('drainStartBtn').disabled = n === 0;
+
+      document.getElementById('drainPreviewLoading').classList.add('hidden');
+      document.getElementById('drainPreviewBody').classList.remove('hidden');
+      lucide.createIcons();
+    } catch (e) {
+      document.getElementById('drainPreviewLoading').classList.add('hidden');
+      const err = document.getElementById('drainPreviewError');
+      err.textContent = 'Failed to load preview: ' + e.message;
+      err.classList.remove('hidden');
+    }
+  }
+
+  function closeDrainModal() {
+    if (_drainPoll) { clearInterval(_drainPoll); _drainPoll = null; }
+    document.getElementById('drainModal').classList.add('hidden');
+    document.getElementById('drainModal').classList.remove('flex');
+    _drainAutoRefreshSuppressed = false;
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !document.getElementById('drainModal').classList.contains('hidden')) {
+      closeDrainModal();
+    }
+  });
+
+  async function startDrainRun() {
+    if (!_drainEligibleIds.length) return;
+    _showDrainStage('Running');
+    document.getElementById('drainRunCounter').textContent = '0 / ' + _drainEligibleIds.length;
+    document.getElementById('drainRunStats').textContent = 'fired 0 · skipped 0 · failed 0';
+    document.getElementById('drainProgressBar').style.width = '0%';
+    document.getElementById('drainRunTail').innerHTML = '';
+    const throttle = parseFloat(document.getElementById('drainThrottle').value) || 1.0;
+    const operator = (localStorage.getItem('zsw_operator') || 'anonymous');
+    try {
+      const resp = await fetch('/api/drain/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          post_ids: _drainEligibleIds,
+          throttle_sec: throttle,
+          operator: operator,
+        }),
+      });
+      const d = await resp.json();
+      if (!resp.ok || !d.ok) {
+        document.getElementById('drainRunTail').innerHTML =
+          '<div class="text-rose-700">' + (d.error || 'failed to start') + '</div>';
+        return;
+      }
+      _drainJobId = d.job_id;
+      _drainPoll = setInterval(_pollDrainStatus, 1000);
+    } catch (e) {
+      document.getElementById('drainRunTail').innerHTML =
+        '<div class="text-rose-700">Network error: ' + e.message + '</div>';
+    }
+  }
+
+  async function _pollDrainStatus() {
+    if (!_drainJobId) return;
+    try {
+      const resp = await fetch('/api/drain/status/' + encodeURIComponent(_drainJobId));
+      if (!resp.ok) return;
+      const d = await resp.json();
+      const pct = d.total > 0 ? Math.round(100 * d.done / d.total) : 0;
+      document.getElementById('drainProgressBar').style.width = pct + '%';
+      document.getElementById('drainRunCounter').textContent =
+        d.done + ' / ' + d.total + ' · ' + pct + '%';
+      document.getElementById('drainRunStats').textContent =
+        'fired ' + d.fired + ' · skipped ' + d.skipped + ' · failed ' + d.failed +
+        (d.cancelled ? ' · cancelled' : '');
+      // Render tail (last 8 events).
+      const tailEl = document.getElementById('drainRunTail');
+      tailEl.innerHTML = '';
+      (d.events_tail || []).forEach((ev) => {
+        const row = document.createElement('div');
+        let cls = 'text-muted';
+        let icon = '·';
+        if (ev.status === 'fired')   { cls = 'text-emerald-700'; icon = '✓'; }
+        if (ev.status === 'skipped') { cls = 'text-amber-700';   icon = '↷'; }
+        if (ev.status === 'failed')  { cls = 'text-rose-700';    icon = '✗'; }
+        row.className = cls;
+        const reasonText = ev.reason ? ' — ' + ev.reason : '';
+        row.textContent = icon + '  ' + (ev.post_id || '?') + reasonText;
+        tailEl.appendChild(row);
+      });
+      tailEl.scrollTop = tailEl.scrollHeight;
+      // Done?
+      if (d.finished) {
+        clearInterval(_drainPoll); _drainPoll = null;
+        _showDrainStage('Done');
+        const ok = d.fired;
+        const skip = d.skipped;
+        const fail = d.failed;
+        document.getElementById('drainDoneHeadline').textContent =
+          'Drained ' + ok + ' post' + (ok === 1 ? '' : 's') +
+          (d.cancelled ? ' (stopped early)' : '');
+        document.getElementById('drainDoneSubtext').textContent =
+          ok + ' replies sent · ' + skip + ' skipped · ' + fail + ' failed' +
+          ' · view full log in Activity';
+      }
+    } catch (e) {
+      // transient — keep polling
+    }
+  }
+
+  async function cancelDrainRun() {
+    if (!_drainJobId) return;
+    document.getElementById('drainCancelBtn').disabled = true;
+    try {
+      await fetch('/api/drain/cancel/' + encodeURIComponent(_drainJobId), { method: 'POST' });
+    } catch (_) {}
+  }
+
+  // Auto-refresh the pulse view every 60s — it's a status board.
+  // BUT pause it while a modal/drain is open so we don't yank the
+  // user's progress mid-run.
+  setInterval(function() {
+    if (!_drainAutoRefreshSuppressed) window.location.reload();
+  }, 60000);
+</script>
+</body>
+</html>

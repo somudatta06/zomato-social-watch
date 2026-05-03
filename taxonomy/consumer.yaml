@@ -1,0 +1,568 @@
+# Zomato Consumer App — topic taxonomy
+#
+# This file is the source of truth for consumer-side classification.
+# Edits take effect on next classifier run; no code changes needed.
+#
+# Schema per leaf:
+#   id                     unique snake_case id used downstream
+#   name                   display name
+#   examples               1–3 real or realistic posts that match (used as Claude few-shot)
+#   default_audience       list of teams routed to by default
+#   default_urgency        critical | high | medium | low
+#   severity_rubric        L1–L5 narrative thresholds (per-leaf)
+#   action_hint            terse note for reply drafter (Phase 3)
+#   requires_human_review  if true, never auto-action regardless of confidence
+#   urgency_modifier       float added to topic urgency_score (default 0)
+#   sensitivity_flags      list — religious, caste, gender, sexual, threat, etc.
+#   active                 if false, skipped by classifier (soft-disable)
+#
+# Hierarchy: nested `children:` lists. Properties propagate to children
+# unless explicitly overridden.
+
+side: consumer
+
+categories:
+
+  # ============================================================
+  - id: order_lifecycle
+    name: "C1 Order Lifecycle"
+    description: "End-to-end ordering experience from search to post-delivery."
+    default_audience: [customer-care]
+    default_urgency: medium
+    children:
+
+      - id: discovery
+        name: "C1.1 Discovery / search / browse"
+        examples:
+          - "Why am I not seeing any restaurants near me on Zomato?"
+          - "Search results are random, not showing what I typed"
+        default_audience: [customer-care, eng]
+        action_hint: "Acknowledge, ask for screenshots + city/area to repro"
+
+      - id: menu
+        name: "C1.2 Menu issues"
+        examples:
+          - "Item showed available, said unavailable at checkout"
+          - "Menu prices on Zomato don't match restaurant"
+        default_audience: [customer-care, restaurant-ops]
+        action_hint: "Apologize, ask for restaurant name + screenshot"
+        children:
+          - id: item_unavailable
+            name: "Item shown but unavailable"
+            urgency_modifier: 0.05
+          - id: misleading_photos
+            name: "Photos misleading vs actual food"
+            sensitivity_flags: [potential_misrepresentation]
+          - id: pricing_mismatch
+            name: "Menu price ≠ checkout price"
+            urgency_modifier: 0.10
+            default_audience: [customer-care, restaurant-ops, finance]
+
+      - id: cart_checkout
+        name: "C1.3 Cart / checkout"
+        examples:
+          - "Cart keeps emptying when I add items"
+          - "Couldn't apply coupon, error at checkout"
+        default_audience: [customer-care, eng]
+        action_hint: "Ask for device/OS, screenshot of error"
+
+      - id: payment_selection
+        name: "C1.4 Payment method issue"
+        examples:
+          - "UPI option not showing for my bank"
+          - "Cash on delivery disabled for no reason"
+        default_audience: [customer-care, eng, finance]
+
+      - id: pre_delivery
+        name: "C1.5 Prep / tracking"
+        examples:
+          - "Order has been preparing for an hour"
+          - "Tracking shows agent hasn't moved in 30 min"
+        default_audience: [customer-care]
+        urgency_modifier: 0.15
+
+      - id: delivery
+        name: "C1.6 Delivery"
+        default_audience: [customer-care]
+        children:
+          - id: late
+            name: "C1.6.1 Late delivery"
+            examples:
+              - "Order was 90 minutes late and food was cold"
+              - "Why does my order always come late in Bangalore?"
+            default_urgency: high
+            severity_rubric:
+              L1: "<15 min late, polite tone"
+              L2: "15–45 min late, polite tone"
+              L3: ">45 min OR clear frustration"
+              L4: "Public call-out + high engagement"
+              L5: "Threats / 'last time I order' / viral risk"
+            action_hint: "Empathetic apology + DM offer for order ID"
+
+          - id: not_delivered
+            name: "C1.6.2 Marked delivered but missing [⚠ fraud-adjacent]"
+            examples:
+              - "Marked delivered but I never got it"
+              - "Agent said he gave it but no one came to my door"
+            default_urgency: high
+            urgency_modifier: 0.20
+            default_audience: [customer-care, ops, trust-safety]
+            sensitivity_flags: [fraud_potential]
+            action_hint: "DM-only path, request order ID, escalate to ops"
+
+          - id: wrong_items
+            name: "C1.6.3 Wrong items"
+            examples:
+              - "Ordered chicken biryani, got veg"
+              - "Got someone else's order entirely"
+            action_hint: "Apology + refund/replacement offer via DM"
+
+          - id: missing_items
+            name: "C1.6.4 Missing items"
+            examples:
+              - "Half the order is missing"
+              - "Drinks not included though I paid for them"
+            action_hint: "Apology + DM for partial refund"
+
+          - id: damaged_spilled
+            name: "C1.6.5 Damaged / spilled"
+            examples:
+              - "Curry leaked all over the bag, food ruined"
+              - "Container broken, food everywhere"
+            action_hint: "Apology + photo request + replacement offer"
+
+          - id: cold_spoiled
+            name: "C1.6.6 Cold / spoiled / stale"
+            examples:
+              - "Food arrived cold and tasted stale"
+              - "Spoiled food, had to throw away"
+            urgency_modifier: 0.10
+            action_hint: "Apology + replacement offer; flag if pattern at restaurant"
+
+          - id: agent_behaviour
+            name: "C1.6.7 Agent behaviour — rude/unsafe/identity-mismatch"
+            examples:
+              - "Delivery guy was rude, demanded tip"
+              - "App showed Bal Krishna but actually a Muslim guy came"
+              - "Agent was drunk / unsafe driving"
+            default_urgency: critical
+            urgency_modifier: 0.40
+            default_audience: [trust-safety, customer-care, pr]
+            requires_human_review: true
+            sensitivity_flags: [religious, identity, safety]
+            action_hint: "Manual review only. DM-only response after legal/PR clears."
+
+          - id: agent_communication
+            name: "C1.6.8 Agent communication — abusive / harassment"
+            examples:
+              - "Agent called me 20 times, abusive language"
+              - "Got threatening messages from delivery person"
+            default_urgency: critical
+            default_audience: [trust-safety, legal, customer-care]
+            requires_human_review: true
+            sensitivity_flags: [harassment, threat]
+            action_hint: "Immediate trust-safety escalation; preserve evidence"
+
+      - id: post_delivery
+        name: "C1.7 Post-delivery (rating, review, support follow-up)"
+        examples:
+          - "Tried to rate but app crashed"
+          - "My review was deleted without reason"
+        default_audience: [customer-care, trust-safety]
+
+  # ============================================================
+  - id: payment_billing
+    name: "C2 Payment & Billing"
+    default_audience: [customer-care, finance]
+    default_urgency: high
+    children:
+      - id: wrong_amount
+        name: "C2.1 Wrong amount charged"
+        examples:
+          - "Charged ₹450 but order was ₹350"
+          - "Final amount higher than checkout shown"
+        action_hint: "DM for order ID, finance audit, refund if confirmed"
+
+      - id: double_charge
+        name: "C2.2 Double charge / duplicate transaction"
+        examples:
+          - "Got charged twice for one order"
+          - "Two debits but only one order placed"
+        urgency_modifier: 0.15
+        default_audience: [customer-care, finance]
+
+      - id: refund_pending
+        name: "C2.3 Refund pending"
+        examples:
+          - "Refund still not received after 7 days"
+          - "Promised refund but it's been 2 weeks"
+        default_urgency: high
+        action_hint: "DM for order ID + transaction ID, escalate to finance"
+
+      - id: refund_partial
+        name: "C2.4 Refund partial / inadequate"
+        examples:
+          - "Got refund of ₹100 but I paid ₹500"
+          - "Partial refund without explanation"
+        action_hint: "DM, audit transaction, full refund if warranted"
+
+      - id: promo_coupon
+        name: "C2.5 Promo / coupon issue"
+        examples:
+          - "Coupon shown but not applying at checkout"
+          - "WELCOME50 said expired even though I got it today"
+        default_audience: [customer-care, marketing]
+
+      - id: wallet_issue
+        name: "C2.6 Wallet / Zomato Money issue"
+        examples:
+          - "₹500 missing from my Zomato wallet"
+          - "Can't withdraw wallet balance"
+        urgency_modifier: 0.10
+        default_audience: [customer-care, finance, trust-safety]
+
+      - id: subscription_dispute
+        name: "C2.7 Subscription / Gold auto-renewal dispute"
+        examples:
+          - "Gold renewed without my consent, charged ₹999"
+          - "Cancelled Gold but still charged"
+        urgency_modifier: 0.10
+        default_audience: [customer-care, finance, legal]
+
+  # ============================================================
+  - id: account_access
+    name: "C3 Account & Access"
+    default_audience: [customer-care, trust-safety]
+    default_urgency: medium
+    children:
+      - id: login_otp
+        name: "C3.1 Login / OTP / signup"
+        examples:
+          - "OTP not coming, can't log in"
+          - "Account verification stuck"
+        default_audience: [customer-care, eng]
+
+      - id: account_suspended
+        name: "C3.2 Account suspended / banned"
+        examples:
+          - "Account banned for no reason, appealed weeks ago"
+          - "Why is my account locked? I haven't done anything"
+        urgency_modifier: 0.20
+        default_audience: [customer-care, trust-safety, legal]
+        action_hint: "Review ban reason, due-process required"
+
+      - id: profile_address
+        name: "C3.3 Profile / address management"
+        examples:
+          - "Can't update my address"
+          - "Old phone number stuck on account"
+
+      - id: privacy_concern
+        name: "C3.4 Privacy / data concern"
+        examples:
+          - "Random person knows my order history"
+          - "PII leak, my number exposed to delivery agents"
+        default_urgency: critical
+        urgency_modifier: 0.40
+        default_audience: [trust-safety, legal, pr]
+        requires_human_review: true
+        sensitivity_flags: [privacy, legal_risk]
+        action_hint: "Legal lead. DM-only. Evidence preservation."
+
+      - id: account_hacked
+        name: "C3.5 Account hacked / unauthorized orders"
+        examples:
+          - "Someone ordered ₹3000 worth of food on my account"
+          - "Account hacked, fraudulent orders placed"
+        default_urgency: critical
+        urgency_modifier: 0.40
+        default_audience: [trust-safety, customer-care, finance, legal]
+        requires_human_review: true
+        sensitivity_flags: [fraud, security]
+        action_hint: "Immediate account lock + investigation"
+
+  # ============================================================
+  - id: loyalty_promos
+    name: "C4 Loyalty & Promos"
+    default_audience: [customer-care, marketing]
+    default_urgency: medium
+    children:
+      - id: gold_benefit
+        name: "C4.1 Zomato Gold benefit not honoured"
+        examples:
+          - "Gold says 30% off but only 10% applied"
+          - "Restaurant didn't honour Gold benefit"
+        action_hint: "DM for order ID + restaurant; escalate to merchant-ops if pattern"
+
+      - id: coupon_referral
+        name: "C4.2 Coupon / referral broken"
+        examples:
+          - "Referral didn't credit"
+          - "Welcome coupon not working"
+
+      - id: cashback_dispute
+        name: "C4.3 Cashback dispute"
+        examples:
+          - "Promised cashback never came"
+          - "Wrong cashback amount credited"
+
+  # ============================================================
+  - id: app_technical
+    name: "C5 App / Technical"
+    default_audience: [eng]
+    default_urgency: medium
+    action_hint: "Ask for device/OS/app-version + screenshot of error; route to eng triage"
+    children:
+      - id: crash_freeze
+        name: "C5.1 Crash / freeze"
+        examples:
+          - "App crashes every time I open it"
+          - "Stuck at loading, can't proceed"
+        urgency_modifier: 0.10
+
+      - id: slow_performance
+        name: "C5.2 Slow / performance regression"
+        examples:
+          - "App is so slow today"
+          - "Loading takes 30+ seconds since the update"
+
+      - id: search_broken
+        name: "C5.3 Search / discovery broken"
+        examples:
+          - "Search returns nothing for any query"
+          - "Filters not working"
+
+      - id: notifications
+        name: "C5.4 Notifications missing or excessive"
+        examples:
+          - "Stop sending me 10 notifications a day"
+          - "Order updates not coming through"
+
+      - id: feature_regression
+        name: "C5.5 Feature regression"
+        examples:
+          - "Schedule order option vanished after update"
+          - "Old feature X no longer works"
+
+      - id: localization
+        name: "C5.6 Localization / language / accessibility"
+        examples:
+          - "Hindi labels broken in app"
+          - "Screen reader can't read menu"
+
+  # ============================================================
+  - id: safety
+    name: "C6 Safety [TRIPWIRE-CAPABLE]"
+    default_audience: [trust-safety, legal, pr, customer-care]
+    default_urgency: critical
+    requires_human_review: true
+    description: "Health and safety incidents. Tripwires fire deterministically; never auto-action."
+    children:
+      - id: food_poisoning
+        name: "C6.1 Food poisoning / illness claim"
+        examples:
+          - "Got food poisoning from yesterday's Zomato order, hospitalized"
+          - "Whole family fell ill after ordering from [restaurant]"
+        sensitivity_flags: [health, legal_risk]
+        action_hint: "Immediate safety + legal escalation. DM for order ID + medical evidence. Restaurant audit triggered."
+
+      - id: foreign_object
+        name: "C6.2 Foreign object in food"
+        examples:
+          - "Found hair / glass / insect in my order"
+          - "Found a worm in my food"
+        sensitivity_flags: [health, legal_risk]
+        action_hint: "Apology + DM + photo request + restaurant audit"
+
+      - id: allergic_reaction
+        name: "C6.3 Allergic reaction"
+        examples:
+          - "Severe allergic reaction, ER visit after Zomato order"
+          - "Allergens not declared, had to go to hospital"
+        sensitivity_flags: [health, legal_risk]
+
+      - id: hospitalization
+        name: "C6.4 Hospitalization claim"
+        examples:
+          - "In ICU after Zomato order"
+          - "Hospitalized after eating, lab tests confirm food contamination"
+        sensitivity_flags: [health, legal_risk, viral_risk]
+
+      - id: death_claim
+        name: "C6.5 Death claim"
+        examples:
+          - "My father passed away after Zomato food poisoning"
+          - "Death in family from contaminated meal"
+        sensitivity_flags: [health, legal_risk, founder_attention]
+        action_hint: "Founder office + legal + PR immediately. No public response without legal clearance."
+
+      - id: sexual_misconduct
+        name: "C6.6 Sexual harassment / misconduct"
+        examples:
+          - "Delivery agent harassed me / made inappropriate advances"
+          - "Agent followed me into my home"
+        sensitivity_flags: [sexual, legal_risk, evidence_preservation]
+        action_hint: "Trust-safety + legal lead. NEVER public reply. DM only."
+
+      - id: physical_assault
+        name: "C6.7 Physical assault / threat"
+        examples:
+          - "Delivery agent threatened me physically"
+          - "Got into a fight with the agent at my door"
+        sensitivity_flags: [violence, legal_risk]
+
+      - id: underage_alcohol
+        name: "C6.8 Underage / minor served alcohol"
+        examples:
+          - "16 year old ordered alcohol on Zomato"
+          - "Minor served alcohol via Zomato"
+        sensitivity_flags: [legal_risk, regulatory]
+        default_audience: [trust-safety, legal, regulatory-compliance]
+
+  # ============================================================
+  - id: support_experience
+    name: "C7 Support Experience"
+    default_audience: [customer-care-leadership]
+    default_urgency: medium
+    children:
+      - id: bot_loop
+        name: "C7.1 Bot loop / no resolution"
+        examples:
+          - "Customer support bot keeps repeating same answer"
+          - "Stuck in chat loop with no human option"
+        urgency_modifier: 0.10
+
+      - id: rude_cce
+        name: "C7.2 Rude / unprofessional CCE"
+        examples:
+          - "Support agent was rude, hung up on me"
+          - "@zomatocare what audacity your team has, threatening me"
+        urgency_modifier: 0.15
+        default_audience: [customer-care-leadership, qa]
+        action_hint: "Pull call/chat record, leadership review"
+
+      - id: repeated_tickets
+        name: "C7.3 Repeated tickets unresolved"
+        examples:
+          - "Third time complaining about same issue"
+          - "Raised ticket 5 times, no action"
+        urgency_modifier: 0.20
+        default_audience: [customer-care-leadership]
+
+      - id: callback_missed
+        name: "C7.4 Promised callback never came"
+        examples:
+          - "Said they'd call back in 2 hours, been 2 days"
+          - "Promised escalation, never heard back"
+
+  # ============================================================
+  - id: product_feedback
+    name: "C8 Product Feedback / Idea"
+    default_audience: [product]
+    default_urgency: low
+    children:
+      - id: feature_request
+        name: "C8.1 Feature request"
+        examples:
+          - "Wish Zomato had a 'reorder' button"
+          - "Why can't we filter by spice level?"
+
+      - id: ux_critique
+        name: "C8.2 UX critique"
+        examples:
+          - "New UI is hard to navigate"
+          - "Old layout was so much better"
+
+      - id: pricing_fairness
+        name: "C8.3 Pricing / fee fairness"
+        examples:
+          - "Delivery fee surge is ridiculous"
+          - "Why is platform fee always 5 rupees more than competitor?"
+        default_audience: [product, finance, marketing]
+
+  # ============================================================
+  - id: brand_perception
+    name: "C9 Brand Perception (Consumer)"
+    default_audience: [marketing]
+    default_urgency: low
+    children:
+      - id: praise
+        name: "C9.1 Praise / positive review"
+        examples:
+          - "Amazing delivery in 25 minutes, hot food, great experience"
+          - "Best customer service, refunded immediately"
+        default_audience: [marketing]
+        action_hint: "Like + thank publicly, mine for testimonial"
+
+      - id: brand_love
+        name: "C9.2 Brand love (memes, fan content)"
+        examples:
+          - "Zomato 'meme' tweets / wholesome content"
+          - "Fan art or appreciation thread"
+        action_hint: "Amplify if on-brand"
+
+      - id: generic_dissatisfaction
+        name: "C9.3 Generic dissatisfaction"
+        examples:
+          - "Zomato has gone downhill"
+          - "Used to love Zomato, now disappointed"
+          - "@zomato chutya Zomato"
+        action_hint: "Track for sentiment trend; do not auto-reply"
+
+      - id: competitor_comparison
+        name: "C9.4 Comparison vs competitor"
+        examples:
+          - "Swiggy is way better than Zomato now"
+          - "Zomato vs Zepto for grocery"
+        default_audience: [marketing, intel]
+        action_hint: "Track only; competitive-intel report"
+
+  # ============================================================
+  - id: edge_outlier
+    name: "C10 Edge / Outlier"
+    default_audience: [pr]
+    default_urgency: medium
+    children:
+      - id: disaster_emergency
+        name: "C10.1 Disaster / emergency context"
+        examples:
+          - "Cyclone in Mumbai, deliveries continuing dangerously"
+          - "Agent making delivery during heavy rain — concern for safety"
+        default_audience: [ops, pr, trust-safety]
+
+      - id: regulatory_government
+        name: "C10.2 Government / regulatory mention"
+        examples:
+          - "FSSAI complaint filed against Zomato"
+          - "CCPA complaint registered"
+        default_audience: [legal, pr, leadership]
+        urgency_modifier: 0.30
+        sensitivity_flags: [regulatory, legal_risk]
+
+      - id: influencer_press
+        name: "C10.3 Influencer / press talking about Zomato"
+        examples:
+          - "Major food blogger reviewing Zomato"
+          - "ET tweet about Zomato earnings"
+        default_audience: [pr, founder-office]
+        urgency_modifier: 0.20
+
+      - id: discrimination_claim
+        name: "C10.4 Discrimination claim (race, religion, caste, gender)"
+        examples:
+          - "Agent refused to deliver to my address because of religion"
+          - "Caste-based remarks from delivery person"
+        default_urgency: critical
+        urgency_modifier: 0.50
+        sensitivity_flags: [religious, caste, gender, legal_risk, viral_risk]
+        requires_human_review: true
+        default_audience: [trust-safety, legal, pr, founder-office]
+
+      - id: off_topic
+        name: "C10.5 Off-topic — uses 'zomato' but not about us"
+        examples:
+          - "Calling someone 'zomato' as slang"
+          - "Tweet mentions zomato in unrelated context"
+        default_audience: []
+        default_urgency: low
+        action_hint: "Dismiss as noise"

@@ -1,0 +1,226 @@
+{# ============================================================
+   Slim shared sidebar — included by pulse.html and dashboard.html.
+   Five sections, ~14 items max (vs the old 22).
+   Filtering moves to the top filter bar of /inbox; sidebar
+   is for navigation between views and discovery (themes).
+   ============================================================ #}
+{% import '_icons.html' as icons %}
+<aside class="w-60 flex-shrink-0 bg-white border-r border-line flex flex-col">
+
+  <!-- Logo / title — Zomato wordmark + Watch product label (stacked) -->
+  <div class="h-16 flex items-center px-5 border-b border-line">
+    <a href="/" class="flex flex-col group leading-none">
+      <span class="text-zomato font-extrabold text-[22px] lowercase tracking-[-0.045em] leading-none group-hover:opacity-90">zomato</span>
+      <span class="text-muted text-[9.5px] font-semibold uppercase tracking-[0.22em] mt-1.5">Social Watch</span>
+    </a>
+  </div>
+
+  <nav class="flex-1 overflow-y-auto scroll-area px-3 py-4 space-y-5 text-[13.5px]">
+
+    <!-- ========== OVERVIEW ========== -->
+    <div>
+      <div class="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">Overview</div>
+      <a href="/" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle font-medium {% if active_view == 'pulse' %}active{% endif %}">
+        <i data-lucide="home" class="nav-icon w-4 h-4 text-muted"></i>
+        <span>Home</span>
+      </a>
+      <a href="/inbox" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if active_view == 'inbox' and not filters.overdue and not filters.cluster_id and (filters.source or 'all') == 'all' and (filters.side or 'all') == 'all' and (filters.urgency or 'all') == 'all' and not filters.author_tier and (filters.response or 'all') == 'all' %}active{% endif %}">
+        <i data-lucide="inbox" class="nav-icon w-4 h-4 text-muted"></i>
+        <span>Inbox</span>
+        <span class="ml-auto text-[12px] text-muted">{{ counts.total }}</span>
+      </a>
+      <a href="/themes"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if active_view == 'themes' %}active{% endif %}"
+         title="Discovery: themed buckets of similar posts (food safety, refunds, late delivery, etc.). Click to browse all active themes with sample posts.">
+        <i data-lucide="compass" class="nav-icon w-4 h-4 text-muted"></i>
+        <span>Discovery</span>
+      </a>
+      <a href="/operations"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if active_view == 'operations' %}active{% endif %}"
+         title="Operations: top complained restaurants, city heatmap, time-of-day patterns over last 7 days.">
+        <i data-lucide="store" class="nav-icon w-4 h-4 text-muted"></i>
+        <span>Operations</span>
+      </a>
+      <a href="/briefing"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if active_view == 'briefing' %}active{% endif %}"
+         title="Daily briefing: 9am-style executive memo with KPIs, anomalies, and the day's top risks.">
+        <i data-lucide="newspaper" class="nav-icon w-4 h-4 text-muted"></i>
+        <span>Briefing</span>
+      </a>
+      <a href="/actions"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if active_view == 'actions' %}active{% endif %}"
+         title="Activity — what we shipped to customers and the team in the last 24 hours.">
+        <i data-lucide="send" class="nav-icon w-4 h-4 text-muted"></i>
+        <span>Activity</span>
+      </a>
+    </div>
+
+    <!-- ========== LIVE FEED — Reddit + Twitter as primary lens ========== -->
+    <div>
+      <div class="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">Live feed</div>
+      <a href="/inbox?source=reddit"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if filters.source == 'reddit' %}active{% endif %}">
+        <span class="nav-icon flex items-center justify-center w-4 h-4 text-[#FF4500]">{{ icons.source_logo('reddit', size='16') }}</span>
+        <span>Reddit</span>
+        <span class="ml-auto text-[12px] text-muted">{{ counts.by_source.get('reddit', 0) }}</span>
+      </a>
+      <a href="/inbox?source=twitter"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if filters.source == 'twitter' %}active{% endif %}">
+        <span class="nav-icon flex items-center justify-center w-4 h-4 text-ink">{{ icons.source_logo('twitter', size='14') }}</span>
+        <span>X (Twitter)</span>
+        <span class="ml-auto text-[12px] text-muted">{{ counts.by_source.get('twitter', 0) }}</span>
+      </a>
+    </div>
+
+    <!-- ========== ACTION QUEUE — always rendered so JS can reveal items
+         on the fly when an operator flags or acks. The wrapper itself
+         and each item are hidden via class when count is 0 — toggleFlag()
+         flips the visibility optimistically without a page reload. -->
+    {% set _stale_n   = counts.stale or 0 %}
+    {% set _flagged_n = counts.flagged or 0 %}
+    {% set _aq_visible = (_stale_n > 0) or (_flagged_n > 0) %}
+    <div data-action-queue {% if not _aq_visible %}class="hidden"{% endif %}>
+      <div class="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">Action queue</div>
+      <a data-stale-nav
+         href="/inbox?overdue=1&window=week&sort=created"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if filters.overdue %}active{% endif %} {% if _stale_n == 0 %}hidden{% endif %}"
+         title="Critical and High urgency posts older than 2 hours with no Zomato reply. The action queue — open these first.">
+        <i data-lucide="alert-triangle" class="nav-icon w-4 h-4 text-amber-600 flex-shrink-0"></i>
+        <span class="font-medium">No reply yet (&gt;2h)</span>
+        <span class="ml-auto text-[12px] text-amber-700 font-semibold" data-stale-count>{{ _stale_n }}</span>
+      </a>
+      <a data-flagged-nav
+         href="/inbox?flagged=1&window=all"
+         class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if filters.flagged %}active{% endif %} {% if _flagged_n == 0 %}hidden{% endif %}"
+         title="Posts you flagged for follow-up. Click the star on any post to add it here.">
+        <i data-lucide="star" class="nav-icon w-4 h-4 text-amber-500 flex-shrink-0 fill-current"></i>
+        <span class="font-medium">Flagged</span>
+        <span class="ml-auto text-[12px] text-amber-700 font-semibold" data-flagged-count>{{ _flagged_n }}</span>
+      </a>
+    </div>
+
+
+    <!-- ========== FILTERED OUT — noise buckets, collapsed by default ==========
+         The default inbox excludes these posts entirely. Operator clicks a
+         bucket name to audit that category; otherwise they don't exist as
+         far as the dashboard is concerned. No scores, no badges, no
+         "suspect" UI cluttering the rows.
+    -->
+    {% if counts.noise_total and counts.noise_total > 0 %}
+    <details {% if filters.noise and filters.noise != 'all' %}open{% endif %}>
+      <summary class="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted cursor-pointer flex items-center gap-1.5 select-none">
+        <span>Filtered out</span>
+        <span class="ml-auto text-[10.5px] text-muted">{{ counts.noise_total }}</span>
+        <i data-lucide="chevron-down" class="w-3 h-3 text-muted/70"></i>
+      </summary>
+      {% set noise_labels = {
+          'promo':     'Promo & spam',
+          'job':       'Jobs & hiring',
+          'stock':     'Stock chatter',
+          'off_topic': 'Off-topic',
+          'bot':       'Bots & low-effort',
+      } %}
+      {% set noise_icons = {
+          'promo':     'tag',
+          'job':       'briefcase',
+          'stock':     'trending-up',
+          'off_topic': 'shuffle',
+          'bot':       'bot',
+      } %}
+      {% for cat in ['promo', 'job', 'stock', 'off_topic', 'bot'] %}
+        {% set n = counts.by_noise.get(cat, 0) if counts.by_noise else 0 %}
+        {% if n > 0 %}
+          <a href="/inbox?noise={{ cat }}"
+             class="nav-item flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-subtle {% if filters.noise == cat %}active{% endif %}"
+             title="View only posts categorised as {{ noise_labels[cat] }} (filtered out of the default inbox)">
+            <i data-lucide="{{ noise_icons[cat] }}" class="nav-icon w-4 h-4 text-muted"></i>
+            <span>{{ noise_labels[cat] }}</span>
+            <span class="ml-auto text-[12px] text-muted">{{ n }}</span>
+          </a>
+        {% endif %}
+      {% endfor %}
+    </details>
+    {% endif %}
+
+    <!-- ========== INFLUENCE — high-leverage authors only ==========
+         Tiers in priority order (most-impactful first). Empty tiers are
+         hidden so the sidebar stays compact; the section header shows
+         the total active count as a single signal. A NEW chip lights up
+         when at least one post in the tier landed in the last hour.
+         ========================================================== -->
+    {# Influence = high-leverage AUTHORS — people whose post matters
+       because of who they are (a journalist's tweet becomes news; a
+       politician's tweet creates regulatory risk). NOT post content
+       — for "post mentions @deepigoyal", the classifier fires the
+       founder_mention tripwire which appears as a Critical chip on the
+       row itself. We deliberately omit the 'founder' author tier here:
+       it would only show posts authored BY the founder (Deepinder's
+       own tweets), which the social-watch team rarely needs to triage. #}
+    {% set _tiers = [
+      ('press',         'Press',            'newspaper', 'orange', 'tier-press'),
+      ('politician',    'Politician',       'landmark',  'pink',   'tier-politician'),
+      ('authority',     'Authority',        'shield',    'amber',  'tier-authority'),
+      ('influencer',    'Influencer',       'megaphone', 'violet', 'tier-influencer'),
+      ('power_user',    'Power user',       'zap',       'blue',   'tier-power_user'),
+      ('active_citizen','Active citizen',   'user',      'green',  'tier-active_citizen'),
+    ] %}
+    {% set _td = counts.tier_detail or {} %}
+    {# Jinja scopes {% set %} inside a {% for %} loop locally — without
+       a namespace the count resets after the loop. #}
+    {% set _ns = namespace(active=0) %}
+    {% for k, _, _, _, _ in _tiers %}
+      {% if (_td.get(k, {}).get('count') or 0) > 0 %}{% set _ns.active = _ns.active + 1 %}{% endif %}
+    {% endfor %}
+    {% if _ns.active > 0 %}
+    <details {% if filters.author_tier %}open{% else %}open{% endif %}>
+      <summary class="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted cursor-pointer flex items-center gap-1.5 select-none">
+        <span>Influence</span>
+        <span class="text-muted/50 normal-case font-medium tracking-normal">· {{ _ns.active }} active</span>
+        <i data-lucide="chevron-down" class="w-3 h-3 ml-auto text-muted/70"></i>
+      </summary>
+      {% for key, label, icon, _color, badge_cls in _tiers %}
+        {% set d = _td.get(key, {}) %}
+        {% set n = d.get('count') or 0 %}
+        {% if n > 0 %}
+          <a href="/inbox?author_tier={{ key }}&window=all"
+             class="nav-item flex items-center gap-2.5 px-3 py-1.5 rounded-md hover:bg-subtle {% if filters.author_tier == key %}active{% endif %}"
+             title="{{ label }} — most recent post {{ d.get('latest_at', '')[:19].replace('T', ' ') }} UTC">
+            <i data-lucide="{{ icon }}" class="nav-icon w-4 h-4 text-muted flex-shrink-0"></i>
+            <span class="truncate">{{ label }}</span>
+            {% if d.get('new_in_hour') %}
+              <span class="px-1 py-0 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold uppercase tracking-wider">New</span>
+            {% endif %}
+            <span class="ml-auto text-[12px] text-muted tabular-nums">{{ n }}</span>
+          </a>
+        {% endif %}
+      {% endfor %}
+    </details>
+    {% endif %}
+
+  </nav>
+
+  <!-- Footer status -->
+  <div class="border-t border-line p-3 text-[11.5px] text-muted">
+    {% if sync_state.is_running %}
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+        <span>Syncing now…</span>
+      </div>
+    {% elif sync_state.last_error %}
+      <div class="flex items-center gap-2 text-rose-700">
+        <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+        <span title="{{ sync_state.last_error }}">Last sync failed</span>
+      </div>
+    {% elif last_sync_iso %}
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span>Last sync {{ last_sync_ago }}</span>
+      </div>
+    {% else %}
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+        <span>Never synced</span>
+      </div>
+    {% endif %}
+  </div>
+</aside>
