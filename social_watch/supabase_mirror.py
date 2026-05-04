@@ -22,6 +22,21 @@ import httpx
 from loguru import logger
 
 
+FULL_COLUMNS = (
+    "id", "source", "native_id", "author", "content", "url",
+    "created_at", "fetched_at", "metadata",
+    "category", "score", "classification", "classified_at",
+    "action_taken", "action_meta", "actioned_at",
+    "zomato_response_status", "zomato_response_url",
+    "zomato_response_at", "zomato_response_checked_at",
+    "priority_score", "priority_band", "priority_breakdown",
+    "noise_category", "flagged_at",
+    "ack_at", "ack_by", "ack_deadline_at",
+    "escalation_count", "last_escalated_at",
+    "review_issue_id", "review_issue_url", "review_created_at",
+)
+
+
 def _is_configured() -> bool:
     return bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_KEY"))
 
@@ -46,10 +61,10 @@ async def mirror_posts(rows: Iterable[dict[str, Any]]) -> None:
         "apikey": key,
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
-        "Prefer": "resolution=ignore-duplicates",
+        "Prefer": "resolution=merge-duplicates",
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(url, headers=headers, json=rows)
         if r.status_code >= 400:
             logger.warning(
@@ -82,7 +97,7 @@ async def restore_to_sqlite(db_path: str | Path) -> int:
     base_url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/posts"
     key = os.environ["SUPABASE_SERVICE_KEY"]
     headers = {"apikey": key, "Authorization": f"Bearer {key}"}
-    cols = "id,source,native_id,author,content,url,created_at,fetched_at,metadata"
+    cols = ",".join(FULL_COLUMNS)
     PAGE = 1000
     offset = 0
     rows: list[dict[str, Any]] = []
@@ -113,14 +128,11 @@ async def restore_to_sqlite(db_path: str | Path) -> int:
         logger.info("[supabase] restore: no rows in remote table")
         return 0
 
+    col_list = ", ".join(FULL_COLUMNS)
+    placeholders = ", ".join(f":{c}" for c in FULL_COLUMNS)
     async with aiosqlite.connect(str(db_path)) as db:
         await db.executemany(
-            """
-            INSERT OR IGNORE INTO posts
-              (id, source, native_id, author, content, url, created_at, fetched_at, metadata)
-            VALUES
-              (:id, :source, :native_id, :author, :content, :url, :created_at, :fetched_at, :metadata)
-            """,
+            f"INSERT OR IGNORE INTO posts ({col_list}) VALUES ({placeholders})",
             rows,
         )
         await db.commit()

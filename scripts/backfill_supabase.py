@@ -17,13 +17,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from social_watch.supabase_mirror import mirror_posts  # noqa: E402
+from social_watch.supabase_mirror import FULL_COLUMNS, mirror_posts  # noqa: E402
 
 
-COLUMNS = [
-    "id", "source", "native_id", "author", "content", "url",
-    "created_at", "fetched_at", "metadata",
-]
+COLUMNS = list(FULL_COLUMNS)
 BATCH = 200
 
 
