@@ -98,17 +98,27 @@ async def _background_sync_loop() -> None:
             # Then groups recent posts into clusters for crisis detection.
             # Done BEFORE dispatch so the action dispatcher sees fresh
             # priority scores and any newly-formed clusters.
+            # Each of these runs independently. velocity uses Playwright +
+            # Twitter cookies and fails on cloud IPs where cookies aren't
+            # honored; we don't want that to take themes or clusters down
+            # with it.
             try:
                 await velocity.take_snapshots(budget=30)
                 await velocity.attach_velocity_to_classifications()
+            except Exception:
+                logger.exception("[bg-sync] velocity failed")
+            try:
                 # Theme-based clustering (the operator's "what are people saying?"
                 # question). Buckets by content pattern, not geography.
                 await themes.detect_themes(window_hours=24, min_group=3)
+            except Exception:
+                logger.exception("[bg-sync] themes failed")
+            try:
                 # Geographic burst detection still runs for true ops-outage
-                # signals (30+ posts, same city, 30 min) — different cluster_type.
+                # signals (30+ posts, same city, 30 min). Different cluster_type.
                 await clusters.detect_clusters()
             except Exception:
-                logger.exception("[bg-sync] velocity/themes/clusters failed")
+                logger.exception("[bg-sync] clusters failed")
             # Phase 3: auto-fire Slack for unactioned P0 posts. Wrapped in
             # try/except so a Slack outage or bad webhook can't take the
             # background loop offline.
