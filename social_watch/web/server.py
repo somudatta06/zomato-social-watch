@@ -239,6 +239,19 @@ async def lifespan(app: FastAPI):
         await storage.init()
         await restore_to_sqlite(config.DB_PATH)
 
+    # Ensure side-tables exist before the bg loop runs. themes.detect_themes
+    # writes to the clusters table (created by clusters.ensure_schema), and on
+    # a fresh container the bg loop's themes call would otherwise fail with
+    # "no such table: clusters" before clusters.detect_clusters got a chance
+    # to create it.
+    try:
+        from .. import auto_reply, clusters, velocity
+        await clusters.ensure_schema()
+        await velocity.ensure_schema()
+        await auto_reply.ensure_schema()
+    except Exception:
+        logger.exception("[startup] side-table init failed")
+
     sync_task: asyncio.Task | None = None
     if _AUTO_SYNC:
         logger.info(
